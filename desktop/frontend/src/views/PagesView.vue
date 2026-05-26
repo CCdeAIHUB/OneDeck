@@ -1,11 +1,17 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import PageHeader from '@/components/PageHeader.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useDesignStore } from '@/stores/design'
 import { useRouter } from 'vue-router'
+import { ref } from 'vue'
 
 const designStore = useDesignStore()
 const router = useRouter()
+
+const showDeleteConfirm = ref(false)
+const deleteTargetId = ref<string | null>(null)
+const deleteTargetName = ref('')
 
 function createNew() {
   const page = designStore.createPage()
@@ -16,8 +22,19 @@ function editPage(id: string) {
   router.push(`/pages/${id}/designer`)
 }
 
-function deletePage(id: string) {
-  designStore.deletePage(id)
+function askDeletePage(id: string) {
+  const page = designStore.pages.find(p => p.id === id)
+  deleteTargetId.value = id
+  deleteTargetName.value = page?.name ?? ''
+  showDeleteConfirm.value = true
+}
+
+function confirmDeletePage() {
+  if (deleteTargetId.value) {
+    designStore.deletePage(deleteTargetId.value)
+  }
+  showDeleteConfirm.value = false
+  deleteTargetId.value = null
 }
 
 function exportPage(page: any) {
@@ -35,11 +52,7 @@ function exportPage(page: any) {
   <div>
     <PageHeader title="页面" subtitle="设计移动端页面布局" icon="solar:clipboard-list-bold">
       <template #actions>
-        <button
-          class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm text-white transition-colors"
-          style="background-color: var(--color-primary);"
-          @click="createNew"
-        >
+        <button class="btn-primary" @click="createNew">
           <Icon icon="solar:add-circle-bold" class="text-base" />
           新建页面
         </button>
@@ -119,7 +132,7 @@ function exportPage(page: any) {
             <button
               class="opacity-0 group-hover:opacity-100 p-1.5 transition-all hover:text-red-400"
               style="color: var(--color-text-muted);"
-              @click.stop="deletePage(page.id)"
+              @click.stop="askDeletePage(page.id)"
             >
               <Icon icon="solar:trash-bin-trash-bold" class="text-sm" />
             </button>
@@ -127,5 +140,16 @@ function exportPage(page: any) {
         </div>
       </div>
     </div>
+
+    <!-- 删除确认 -->
+    <ConfirmDialog
+      v-if="showDeleteConfirm"
+      title="删除页面"
+      :message="`确定要删除页面「${deleteTargetName}」吗？此操作不可恢复。`"
+      confirm-text="删除"
+      :danger="true"
+      @confirm="confirmDeletePage"
+      @cancel="showDeleteConfirm = false"
+    />
   </div>
 </template>

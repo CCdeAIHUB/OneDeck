@@ -24,7 +24,7 @@ export const useConnectionStore = defineStore('connection', () => {
     socket.onopen = () => {
       connected.value = true
       reconnectAttempts.value = 0
-      console.log('[OneDeck] Connected to desktop backend')
+      console.log('[OneDesk] Connected to desktop backend')
     }
 
     socket.onclose = () => {
@@ -33,7 +33,7 @@ export const useConnectionStore = defineStore('connection', () => {
     }
 
     socket.onerror = (err) => {
-      console.error('[OneDeck] WebSocket error:', err)
+      console.error('[OneDesk] WebSocket error:', err)
     }
 
     socket.onmessage = (event) => {
@@ -41,7 +41,7 @@ export const useConnectionStore = defineStore('connection', () => {
         const message = JSON.parse(event.data)
         handleMessage(message)
       } catch (e) {
-        console.error('[OneDeck] Failed to parse message:', e)
+        console.error('[OneDesk] Failed to parse message:', e)
       }
     }
 
@@ -71,7 +71,7 @@ export const useConnectionStore = defineStore('connection', () => {
     const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.value), maxReconnectDelay)
     reconnectAttempts.value++
 
-    console.log(`[OneDeck] Reconnecting in ${delay}ms (attempt ${reconnectAttempts.value})`)
+    console.log(`[OneDesk] Reconnecting in ${delay}ms (attempt ${reconnectAttempts.value})`)
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null
       connect(url)

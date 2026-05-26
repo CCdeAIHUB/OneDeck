@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import PageHeader from '@/components/PageHeader.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useSchemeStore } from '@/stores/schemes'
 import { useRouter } from 'vue-router'
 import { ref } from 'vue'
@@ -10,6 +11,9 @@ const router = useRouter()
 
 const showCreateDialog = ref(false)
 const newSchemeName = ref('')
+const showDeleteConfirm = ref(false)
+const deleteTargetId = ref<string | null>(null)
+const deleteTargetName = ref('')
 
 function createScheme() {
   showCreateDialog.value = true
@@ -42,10 +46,19 @@ function editScheme(id: string) {
   router.push(`/schemes/${id}/editor`)
 }
 
-function deleteScheme(id: string) {
-  if (confirm('确定删除该方案？')) {
-    schemeStore.removeScheme(id)
+function askDeleteScheme(id: string) {
+  const scheme = schemeStore.schemes.find(s => s.id === id)
+  deleteTargetId.value = id
+  deleteTargetName.value = scheme?.name ?? ''
+  showDeleteConfirm.value = true
+}
+
+function confirmDeleteScheme() {
+  if (deleteTargetId.value) {
+    schemeStore.removeScheme(deleteTargetId.value)
   }
+  showDeleteConfirm.value = false
+  deleteTargetId.value = null
 }
 </script>
 
@@ -53,13 +66,7 @@ function deleteScheme(id: string) {
   <div>
     <PageHeader title="方案管理" subtitle="设计移动端界面方案" icon="solar:layers-bold">
       <template #actions>
-        <button
-          class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors text-white"
-          style="background-color: var(--color-primary);"
-          @mouseover="($event.target as HTMLElement).style.backgroundColor = 'var(--color-primary-hover)'"
-          @mouseout="($event.target as HTMLElement).style.backgroundColor = 'var(--color-primary)'"
-          @click="createScheme"
-        >
+        <button class="btn-primary" @click="createScheme">
           <Icon icon="solar:add-circle-bold" class="text-base" />
           新建方案
         </button>
@@ -102,7 +109,7 @@ function deleteScheme(id: string) {
           <span>更新于 {{ new Date(scheme.updatedAt).toLocaleDateString() }}</span>
           <div class="flex items-center gap-2">
             <Icon icon="solar:pen-bold" class="text-sm" style="color: var(--color-primary);" />
-            <button class="hover:text-red-400 transition-colors" @click.stop="deleteScheme(scheme.id)">
+            <button class="hover:text-red-400 transition-colors" @click.stop="askDeleteScheme(scheme.id)">
               <Icon icon="solar:trash-bin-trash-bold" class="text-sm" />
             </button>
           </div>
@@ -125,22 +132,21 @@ function deleteScheme(id: string) {
           />
         </div>
         <div class="flex gap-3 justify-end">
-          <button
-            class="px-4 py-2 rounded-lg text-sm transition-colors"
-            style="background-color: var(--color-bg-surface); color: var(--color-text-muted);"
-            @click="showCreateDialog = false"
-          >
-            取消
-          </button>
-          <button
-            class="px-4 py-2 rounded-lg text-sm text-white transition-colors"
-            style="background-color: var(--color-primary);"
-            @click="confirmCreate"
-          >
-            创建
-          </button>
+          <button class="btn-secondary" @click="showCreateDialog = false">取消</button>
+          <button class="btn-primary" @click="confirmCreate">创建</button>
         </div>
       </div>
     </div>
+
+    <!-- 删除确认 -->
+    <ConfirmDialog
+      v-if="showDeleteConfirm"
+      title="删除方案"
+      :message="`确定要删除方案「${deleteTargetName}」吗？此操作不可恢复。`"
+      confirm-text="删除"
+      :danger="true"
+      @confirm="confirmDeleteScheme"
+      @cancel="showDeleteConfirm = false"
+    />
   </div>
 </template>

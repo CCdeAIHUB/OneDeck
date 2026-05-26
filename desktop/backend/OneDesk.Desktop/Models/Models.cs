@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace OneDeck.Desktop.Models;
+namespace OneDesk.Desktop.Models;
 
 /// <summary>
 /// 已连接的移动端设备信息

@@ -2,32 +2,36 @@ using System;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Web.WebView2.WinForms;
-using OneDeck.Desktop.Services;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.FileProviders;
-using Microsoft.AspNetCore.Http;
+using OneDesk.Desktop.Services;
 
-namespace OneDeck.Desktop;
+namespace OneDesk.Desktop;
 
 /// <summary>
 /// 主窗口 - 使用 WebView2 承载 Vue 前端
 /// 自绘标题栏：前端 Vue 自行绘制，窗口设为无边框
+/// 前端资源通过 WebView2 SetVirtualHostNameToFolderMapping 以文件方式加载，无需 HTTP 服务器
 /// </summary>
 public class MainForm : Form
 {
     private WebView2? webView;
-    private readonly int _httpPort;
     private readonly int _wsPort;
     private StorageService? _storageService;
     private LogService? _logService;
 
-    public MainForm(int httpPort, int wsPort)
+    // Win32 API 用于无边框窗口拖拽
+    [DllImport("user32.dll")]
+    private static extern int ReleaseCapture();
+    [DllImport("user32.dll")]
+    private static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
+    private const int WM_NCLBUTTONDOWN = 0xA1;
+    private const int HTCAPTION = 2;
+
+    public MainForm(int wsPort)
     {
-        _httpPort = httpPort;
         _wsPort = wsPort;
         InitializeForm();
         InitializeBackend();
@@ -36,7 +40,7 @@ public class MainForm : Form
     private void InitializeForm()
     {
         // 窗口基本设置
-        Text = "OneDeck";
+        Text = "OneDesk";
         Size = new Size(1280, 800);
         MinimumSize = new Size(960, 600);
         StartPosition = FormStartPosition.CenterScreen;
@@ -58,31 +62,51 @@ public class MainForm : Form
 
             _logService.Info("MainForm", "Backend services initialized");
 
-            // 2. 启动 Kestrel HTTP 服务器
-            await StartHttpServerAsync(_httpPort);
-
-            // 3. 创建 WebView2 控件
+            // 2. 创建 WebView2 控件
             webView = new WebView2
             {
                 Dock = DockStyle.Fill
             };
             Controls.Add(webView);
 
-            // 4. 初始化 WebView2 运行时
+            // 3. 初始化 WebView2 运行时
             await webView.EnsureCoreWebView2Async(null);
 
             // 注册消息处理（前端通过 postMessage 与 C# 通讯）
             webView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
 
-            // 5. 导航到前端页面
-            var url = $"http://localhost:{_httpPort}";
-            webView.CoreWebView2.Navigate(url);
+            // 4. 确定前端文件路径
+            var wwwrootPath = System.IO.Path.Combine(AppContext.BaseDirectory, "wwwroot");
+            if (!System.IO.Directory.Exists(wwwrootPath) || !System.IO.Directory.EnumerateFiles(wwwrootPath, "*.html").Any())
+            {
+                // 尝试开发目录
+                var devPath = System.IO.Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "frontend", "dist");
+                if (System.IO.Directory.Exists(devPath))
+                {
+                    wwwrootPath = System.IO.Path.GetFullPath(devPath);
+                }
+                else
+                {
+                    System.IO.Directory.CreateDirectory(wwwrootPath);
+                }
+            }
+
+            // 5. 使用 SetVirtualHostNameToFolderMapping 将前端文件映射为虚拟主机
+            // 前端资源以文件方式加载，无需 HTTP 服务器
+            webView.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                "onedesk.local",
+                wwwrootPath,
+                Microsoft.Web.WebView2.Core.CoreWebView2HostResourceAccessKind.Allow
+            );
+
+            // 6. 导航到虚拟主机上的 index.html
+            webView.CoreWebView2.Navigate("https://onedesk.local/index.html");
 
             // 开发者工具
             webView.CoreWebView2.Settings.AreDevToolsEnabled = true;
             webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
 
-            _logService.Info("MainForm", $"WebView2 navigated to {url}");
+            _logService.Info("MainForm", $"WebView2 navigated to https://onedesk.local (root: {wwwrootPath})");
         }
         catch (Exception ex)
         {
@@ -107,62 +131,6 @@ public class MainForm : Form
     }
 
     /// <summary>
-    /// 启动 Kestrel HTTP 服务器，提供前端 Vue 应用的静态文件
-    /// </summary>
-    private async Task StartHttpServerAsync(int port)
-    {
-        var builder = WebApplication.CreateBuilder();
-        builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
-
-        var app = builder.Build();
-
-        // 确定前端文件路径
-        var wwwrootPath = System.IO.Path.Combine(AppContext.BaseDirectory, "wwwroot");
-        if (!System.IO.Directory.Exists(wwwrootPath) || !System.IO.Directory.EnumerateFiles(wwwrootPath, "*.html").Any())
-        {
-            // 尝试开发目录
-            var devPath = System.IO.Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "frontend", "dist");
-            if (System.IO.Directory.Exists(devPath))
-            {
-                wwwrootPath = System.IO.Path.GetFullPath(devPath);
-            }
-            else
-            {
-                System.IO.Directory.CreateDirectory(wwwrootPath);
-            }
-        }
-
-        // 提供静态文件
-        app.UseDefaultFiles(new DefaultFilesOptions
-        {
-            FileProvider = new PhysicalFileProvider(wwwrootPath)
-        });
-        app.UseStaticFiles(new StaticFileOptions
-        {
-            FileProvider = new PhysicalFileProvider(wwwrootPath)
-        });
-
-        // SPA 路由回退
-        app.MapFallback(async (HttpContext ctx) =>
-        {
-            var indexPath = System.IO.Path.Combine(wwwrootPath, "index.html");
-            if (System.IO.File.Exists(indexPath))
-            {
-                ctx.Response.ContentType = "text/html";
-                await ctx.Response.SendFileAsync(indexPath);
-            }
-            else
-            {
-                ctx.Response.StatusCode = 404;
-                await ctx.Response.WriteAsync("Frontend not built. Run: cd desktop/frontend && npm run build");
-            }
-        });
-
-        await app.StartAsync();
-        _logService?.Info("MainForm", $"HTTP server started on http://localhost:{port} (root: {wwwrootPath})");
-    }
-
-    /// <summary>
     /// 处理来自前端的消息
     /// 前端通过 window.chrome.webview.postMessage() 发送消息
     /// </summary>
@@ -179,11 +147,44 @@ public class MainForm : Form
                     WindowState = FormWindowState.Normal;
                 else
                     WindowState = FormWindowState.Maximized;
+                // 同步窗口状态到前端
+                PostWindowState();
                 break;
             case "window:close":
                 Close();
                 break;
+            case "window:getState":
+                PostWindowState();
+                break;
+            case "window:drag":
+                // 前端标题栏拖拽请求：释放鼠标捕获并模拟标题栏拖拽
+                ReleaseCapture();
+                SendMessage(Handle, WM_NCLBUTTONDOWN, HTCAPTION, 0);
+                break;
         }
+    }
+
+    /// <summary>
+    /// 将窗口最大化状态发送到前端
+    /// </summary>
+    private void PostWindowState()
+    {
+        if (webView?.CoreWebView2 != null)
+        {
+            var isMax = WindowState == FormWindowState.Maximized;
+            webView.CoreWebView2.PostWebMessageAsJson(
+                $"{{\"type\":\"window:state\",\"maximized\":{(isMax ? "true" : "false")}}}"
+            );
+        }
+    }
+
+    /// <summary>
+    /// 窗口状态变化时同步到前端
+    /// </summary>
+    protected override void OnResize(EventArgs e)
+    {
+        base.OnResize(e);
+        PostWindowState();
     }
 
     protected override void OnFormClosed(FormClosedEventArgs e)

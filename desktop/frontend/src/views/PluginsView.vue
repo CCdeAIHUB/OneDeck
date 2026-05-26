@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import PageHeader from '@/components/PageHeader.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { usePluginStore } from '@/stores/plugins'
 import { useRouter } from 'vue-router'
 import { ref } from 'vue'
@@ -10,6 +11,9 @@ const router = useRouter()
 
 const showCreateDialog = ref(false)
 const newPluginName = ref('')
+const showDeleteConfirm = ref(false)
+const deleteTargetId = ref<string | null>(null)
+const deleteTargetName = ref('')
 
 function createPlugin() {
   showCreateDialog.value = true
@@ -41,10 +45,19 @@ function togglePlugin(pluginId: string) {
   pluginStore.togglePlugin(pluginId)
 }
 
-function deletePlugin(id: string) {
-  if (confirm('确定删除该插件？')) {
-    pluginStore.removePlugin(id)
+function askDeletePlugin(id: string) {
+  const plugin = pluginStore.plugins.find(p => p.id === id)
+  deleteTargetId.value = id
+  deleteTargetName.value = plugin?.name ?? ''
+  showDeleteConfirm.value = true
+}
+
+function confirmDeletePlugin() {
+  if (deleteTargetId.value) {
+    pluginStore.removePlugin(deleteTargetId.value)
   }
+  showDeleteConfirm.value = false
+  deleteTargetId.value = null
 }
 
 function exportPlugin(plugin: any) {
@@ -62,11 +75,7 @@ function exportPlugin(plugin: any) {
   <div>
     <PageHeader title="插件" subtitle="开发和编辑插件代码" icon="solar:code-square-bold">
       <template #actions>
-        <button
-          class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm text-white transition-colors"
-          style="background-color: var(--color-primary);"
-          @click="createPlugin"
-        >
+        <button class="btn-primary" @click="createPlugin">
           <Icon icon="solar:add-circle-bold" class="text-base" />
           新建插件
         </button>
@@ -76,7 +85,7 @@ function exportPlugin(plugin: any) {
     <div v-if="pluginStore.plugins.length === 0" class="text-center py-20">
       <Icon icon="solar:code-square-bold" class="text-6xl mb-4 mx-auto block" style="color: var(--color-text-dim);" />
       <h3 class="text-lg font-semibold mb-2" style="color: var(--color-text-muted);">暂无插件</h3>
-      <p class="text-sm" style="color: var(--color-text-dim);">创建一个插件来扩展 OneDeck 的功能</p>
+      <p class="text-sm" style="color: var(--color-text-dim);">创建一个插件来扩展 OneDesk 的功能</p>
       <button
         class="mt-4 px-4 py-2 rounded-lg text-sm text-white transition-colors"
         style="background-color: var(--color-primary);"
@@ -123,7 +132,7 @@ function exportPlugin(plugin: any) {
             <button class="opacity-0 group-hover:opacity-100 p-1.5 transition-all" style="color: var(--color-text-muted);" @click.stop="exportPlugin(plugin)" title="导出">
               <Icon icon="solar:download-bold" class="text-sm" />
             </button>
-            <button class="opacity-0 group-hover:opacity-100 p-1.5 transition-all hover:text-red-400" style="color: var(--color-text-muted);" @click.stop="deletePlugin(plugin.id)">
+            <button class="opacity-0 group-hover:opacity-100 p-1.5 transition-all hover:text-red-400" style="color: var(--color-text-muted);" @click.stop="askDeletePlugin(plugin.id)">
               <Icon icon="solar:trash-bin-trash-bold" class="text-sm" />
             </button>
           </div>
@@ -140,10 +149,21 @@ function exportPlugin(plugin: any) {
           <input v-model="newPluginName" class="w-full mt-1 px-3 py-2 rounded-lg text-sm focus:outline-none" style="background-color: var(--color-bg-surface); border: 1px solid var(--color-border); color: var(--color-text);" placeholder="输入插件名称" @keyup.enter="confirmCreate" />
         </div>
         <div class="flex gap-3 justify-end">
-          <button class="px-4 py-2 rounded-lg text-sm transition-colors" style="background-color: var(--color-bg-surface); color: var(--color-text-muted);" @click="showCreateDialog = false">取消</button>
-          <button class="px-4 py-2 rounded-lg text-sm text-white transition-colors" style="background-color: var(--color-primary);" @click="confirmCreate">创建</button>
+          <button class="btn-secondary" @click="showCreateDialog = false">取消</button>
+          <button class="btn-primary" @click="confirmCreate">创建</button>
         </div>
       </div>
     </div>
+
+    <!-- 删除确认 -->
+    <ConfirmDialog
+      v-if="showDeleteConfirm"
+      title="删除插件"
+      :message="`确定要删除插件「${deleteTargetName}」吗？此操作不可恢复。`"
+      confirm-text="删除"
+      :danger="true"
+      @confirm="confirmDeletePlugin"
+      @cancel="showDeleteConfirm = false"
+    />
   </div>
 </template>

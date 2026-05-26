@@ -5,14 +5,13 @@
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <AssemblyName>OneDeck</AssemblyName>
-    <RootNamespace>OneDeck.Desktop</RootNamespace>
+    <AssemblyName>OneDesk</AssemblyName>
+    <RootNamespace>OneDesk.Desktop</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="9.*" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.*" />
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
   <ItemGroup>

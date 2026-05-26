@@ -1,8 +1,8 @@
 using System;
 using System.Threading.Tasks;
-using OneDeck.Desktop.Services;
+using OneDesk.Desktop.Services;
 
-namespace OneDeck.Desktop;
+namespace OneDesk.Desktop;
 
 /// <summary>
 /// 桌面端应用主入口（已迁移到 MainForm 中启动）

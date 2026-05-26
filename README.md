@@ -1,4 +1,4 @@
-# OneDeck
+# OneDesk
 
 跨平台流控制软件系统，类似 Stream Deck。系统由"桌面端"和"移动端"组成，桌面端作为控制中心与能力底座，移动端作为展示与触发终端。
 
@@ -126,18 +126,18 @@ onedeck/
     │   └── package.json
     │
     ├── android/                   # Android (Kotlin)
-    │   └── app/src/main/java/ai/onedeck/mobile/
+    │   └── app/src/main/java/ai/onedesk/mobile/
     │       ├── MainActivity.kt         # 主 Activity
-    │       ├── OneDeckApplication.kt    # Application
-    │       ├── OneDeckJsBridge.kt       # JSAPI Bridge
+    │       ├── OneDeskApplication.kt    # Application
+    │       ├── OneDeskJsBridge.kt       # JSAPI Bridge
     │       ├── WebSocketClient.kt       # WebSocket 客户端
     │       └── LogBuffer.kt            # 日志环形缓冲区
     │
     ├── ios/                       # iOS (Swift)
-    │   └── OneDeckMobile/
-    │       ├── OneDeckMobileApp.swift   # App 入口
+    │   └── OneDeskMobile/
+    │       ├── OneDeskMobileApp.swift   # App 入口
     │       ├── ContentView.swift        # WebView 容器
-    │       └── OneDeckJsBridge.swift    # JSAPI Bridge
+    │       └── OneDeskJsBridge.swift    # JSAPI Bridge
     │
     └── harmony/                   # HarmonyOS (ArkTS)
         └── entry/src/main/ets/
@@ -156,8 +156,17 @@ onedeck/
 | iOS | Swift |
 | HarmonyOS | ArkTS |
 | 图标 | YesIcon / Solar 图标库 |
+| 代码编辑器 | CodeMirror 6 (MIT) |
 | 数据库 | SQLite (双端) |
 | 通讯 | WebSocket |
+
+## 开源组件声明
+
+本项目使用以下 MIT 协议开源组件：
+
+| 组件 | 版本 | 协议 | 用途 |
+|------|------|------|------|
+| [CodeMirror](https://codemirror.net/) | 6.x | MIT | 代码编辑器（语法高亮、代码折叠） |
 
 ## 开发指南
 
@@ -166,7 +175,7 @@ onedeck/
 ```bash
 # 后端
 cd desktop/backend/OneDesk.Desktop
-dotnet run -- --ws-port 9720 --http-port 9721
+dotnet run -- --ws-port 9720
 
 # 前端
 cd desktop/frontend
@@ -184,10 +193,10 @@ npm run dev
 
 ### 插件开发
 
-插件通过 `@onedeck/plugin-sdk` 开发：
+插件通过 `@onedesk/plugin-sdk` 开发：
 
 ```typescript
-import { definePlugin } from '@onedeck/plugin-sdk'
+import { definePlugin } from '@onedesk/plugin-sdk'
 
 export default definePlugin(
   {

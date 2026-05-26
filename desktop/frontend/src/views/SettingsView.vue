@@ -78,15 +78,15 @@ function exportData(type: 'schemes' | 'pages' | 'components' | 'all') {
   switch (type) {
     case 'schemes':
       data = schemeStore.schemes
-      filename = `onedeck-schemes-${Date.now()}.json`
+      filename = `onedesk-schemes-${Date.now()}.json`
       break
     case 'pages':
       data = designStore.pages
-      filename = `onedeck-pages-${Date.now()}.json`
+      filename = `onedesk-pages-${Date.now()}.json`
       break
     case 'components':
       data = designStore.components
-      filename = `onedeck-components-${Date.now()}.json`
+      filename = `onedesk-components-${Date.now()}.json`
       break
     case 'all':
       data = {
@@ -96,7 +96,7 @@ function exportData(type: 'schemes' | 'pages' | 'components' | 'all') {
         exportedAt: new Date().toISOString(),
         version: '0.1.0',
       }
-      filename = `onedeck-backup-${Date.now()}.json`
+      filename = `onedesk-backup-${Date.now()}.json`
       break
   }
 
@@ -206,7 +206,7 @@ function importData() {
           <div class="flex items-center justify-between gap-4">
             <div class="min-w-0">
               <p class="text-sm">开机自启动</p>
-              <p class="text-xs" style="color: var(--color-text-dim);">系统启动时自动运行 OneDeck</p>
+              <p class="text-xs" style="color: var(--color-text-dim);">系统启动时自动运行 OneDesk</p>
             </div>
             <button
               class="relative w-11 h-6 rounded-full shrink-0 transition-colors duration-200"
@@ -408,7 +408,7 @@ function importData() {
       <div class="rounded-xl p-5 border" style="background-color: var(--color-bg-card); border-color: var(--color-border);">
         <h3 class="font-semibold mb-4">关于</h3>
         <div class="text-sm space-y-1" style="color: var(--color-text-muted);">
-          <p>OneDeck v0.1.0</p>
+          <p>OneDesk v0.1.0</p>
           <p>跨平台流控制软件系统</p>
           <p class="text-xs mt-2" style="color: var(--color-text-dim);">桌面端地址：ws://localhost:{{ wsPort }}</p>
         </div>

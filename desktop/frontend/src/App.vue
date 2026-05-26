@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import TitleBar from '@/components/TitleBar.vue'
 import Sidebar from '@/components/Sidebar.vue'
+import NotificationToast from '@/components/NotificationToast.vue'
 import { useThemeStore } from '@/stores/theme'
 import { onMounted } from 'vue'
 
@@ -25,5 +26,8 @@ onMounted(() => {
         <router-view />
       </main>
     </div>
+
+    <!-- 通知浮层 -->
+    <NotificationToast />
   </div>
 </template>

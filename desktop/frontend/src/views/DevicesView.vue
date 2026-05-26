@@ -25,7 +25,7 @@ function disconnect(deviceId: string) {
   <div>
     <PageHeader title="设备管理" subtitle="管理已连接的移动端设备" icon="solar:smartphone-bold">
       <template #actions>
-        <button class="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm transition-colors">
+        <button class="btn-primary">
           <Icon icon="solar:refresh-bold" class="text-base" />
           扫描设备
         </button>
@@ -35,7 +35,7 @@ function disconnect(deviceId: string) {
     <div v-if="deviceStore.devices.length === 0" class="text-center py-20">
       <Icon icon="solar:smartphone-bold" class="text-6xl text-gray-700 mb-4 mx-auto block" />
       <h3 class="text-lg font-semibold text-gray-400 mb-2">暂无设备连接</h3>
-      <p class="text-sm text-gray-500">在移动设备上打开 OneDeck 应用，输入桌面端地址进行连接</p>
+      <p class="text-sm text-gray-500">在移动设备上打开 OneDesk 应用，输入桌面端地址进行连接</p>
       <p class="text-sm text-gray-600 mt-1">桌面端地址：ws://localhost:9720</p>
     </div>
 

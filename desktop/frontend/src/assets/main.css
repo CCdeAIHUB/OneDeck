@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* OneDeck 主题变量 - 深色模式 (默认) */
+/* OneDesk 主题变量 - 深色模式 (默认) */
 :root,
 .dark {
   --color-primary: #3b82f6;          /* blue-500 */
@@ -135,4 +135,61 @@ html, body, #app {
 
 .traffic-lights:hover .traffic-light-maximize {
   background: #28c840;
+}
+
+/* 主题色按钮通用样式 */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: white;
+  background-color: var(--color-primary);
+  transition: background-color 0.15s, opacity 0.15s;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-primary:hover {
+  background-color: var(--color-primary-hover);
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: var(--color-text-muted);
+  background-color: var(--color-bg-surface);
+  transition: background-color 0.15s;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background-color: var(--color-bg-hover);
+}
+
+/* 删除确认对话框 */
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.dialog-card {
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  width: 24rem;
+  background-color: var(--color-bg-card);
 }

@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using OneDeck.Desktop.Models;
+using OneDesk.Desktop.Models;
 
-namespace OneDeck.Desktop.Services;
+namespace OneDesk.Desktop.Services;
 
 /// <summary>
 /// WebSocket 服务器服务

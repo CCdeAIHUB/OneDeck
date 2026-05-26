@@ -31,6 +31,38 @@ const bgColor = ref('#111827')
 const bgImageUrl = ref('')
 const bgVideoUrl = ref('')
 
+// 本地文件选择
+function pickLocalImage() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'image/*'
+  input.onchange = () => {
+    const file = input.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      bgImageUrl.value = e.target?.result as string
+      savePage()
+    }
+    reader.readAsDataURL(file)
+  }
+  input.click()
+}
+
+function pickLocalVideo() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'video/*'
+  input.onchange = () => {
+    const file = input.files?.[0]
+    if (!file) return
+    const url = URL.createObjectURL(file)
+    bgVideoUrl.value = url
+    savePage()
+  }
+  input.click()
+}
+
 watch(page, (p) => {
   if (!p) return
   pageName.value = p.name
@@ -55,6 +87,11 @@ function applyGridChange() {
 
 function savePage() {
   if (!page.value) return
+  // 名称冲突检测
+  if (designStore.checkDuplicateName(pageName.value, 'page', pageId.value)) {
+    const existingNames = designStore.pages.map(p => p.name)
+    pageName.value = designStore.generateUniqueName(pageName.value, existingNames)
+  }
   designStore.updatePage({
     ...page.value,
     name: pageName.value,
@@ -80,6 +117,9 @@ function updateCellProp(key: keyof PageCell, value: unknown) {
 function goBack() { router.push('/pages') }
 
 const availableComponents = computed(() => designStore.components)
+
+// 页面预览开关：开启后用组件代码渲染，关闭只显示图标/预览图
+const enablePreview = ref(false)
 
 // 设备比例预览
 const devicePreviewStyle = computed(() => {
@@ -170,11 +210,24 @@ const deviceLabel = computed(() => {
         <div v-if="bgType === 'color'">
           <input v-model="bgColor" type="color" @change="savePage" class="w-full h-8 rounded cursor-pointer" />
         </div>
-        <div v-else-if="bgType === 'image'">
-          <input v-model="bgImageUrl" @change="savePage" placeholder="图片URL" class="w-full px-3 py-1.5 rounded-lg text-sm focus:outline-none" style="background-color: var(--color-bg-surface); border: 1px solid var(--color-border); color: var(--color-text);" />
+        <div v-else-if="bgType === 'image'" class="space-y-2">
+          <div class="flex gap-2">
+            <input v-model="bgImageUrl" @change="savePage" placeholder="图片URL" class="flex-1 px-3 py-1.5 rounded-lg text-sm focus:outline-none" style="background-color: var(--color-bg-surface); border: 1px solid var(--color-border); color: var(--color-text);" />
+            <button class="px-3 py-1.5 rounded-lg text-xs transition-colors" style="background-color: var(--color-bg-surface); border: 1px solid var(--color-border); color: var(--color-text-muted);" @click="pickLocalImage">
+              <Icon icon="solar:folder-open-bold" class="text-sm" />
+            </button>
+          </div>
+          <div v-if="bgImageUrl" class="rounded-lg overflow-hidden" style="max-height: 80px;">
+            <img :src="bgImageUrl" class="w-full h-full object-cover" />
+          </div>
         </div>
-        <div v-else>
-          <input v-model="bgVideoUrl" @change="savePage" placeholder="视频URL" class="w-full px-3 py-1.5 rounded-lg text-sm focus:outline-none" style="background-color: var(--color-bg-surface); border: 1px solid var(--color-border); color: var(--color-text);" />
+        <div v-else class="space-y-2">
+          <div class="flex gap-2">
+            <input v-model="bgVideoUrl" @change="savePage" placeholder="视频URL" class="flex-1 px-3 py-1.5 rounded-lg text-sm focus:outline-none" style="background-color: var(--color-bg-surface); border: 1px solid var(--color-border); color: var(--color-text);" />
+            <button class="px-3 py-1.5 rounded-lg text-xs transition-colors" style="background-color: var(--color-bg-surface); border: 1px solid var(--color-border); color: var(--color-text-muted);" @click="pickLocalVideo">
+              <Icon icon="solar:folder-open-bold" class="text-sm" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -240,6 +293,18 @@ const deviceLabel = computed(() => {
 
     <!-- 中间：画布预览 -->
     <div class="flex-1 flex flex-col items-center justify-center rounded-xl border overflow-hidden" style="background-color: var(--color-bg); border-color: var(--color-border);">
+      <!-- 预览控制栏 -->
+      <div class="flex items-center gap-2 py-2 px-4 w-full shrink-0" style="border-bottom: 1px solid var(--color-border-subtle);">
+        <button
+          class="px-3 py-1 text-xs rounded-lg transition-colors"
+          :style="enablePreview ? 'background-color: var(--color-primary); color: white;' : 'background-color: var(--color-bg-surface); color: var(--color-text-muted);'"
+          @click="enablePreview = !enablePreview"
+        >
+          <Icon icon="solar:eye-bold" class="inline mr-1" />
+          {{ enablePreview ? '预览中' : '预览' }}
+        </button>
+        <span class="text-xs" style="color: var(--color-text-dim);">开启后将用组件代码渲染页面</span>
+      </div>
       <div
         class="relative shadow-2xl"
         :style="{
@@ -272,11 +337,20 @@ const deviceLabel = computed(() => {
             }"
             @click="selectCell(cell)"
           >
-            <div v-if="cell.componentId" class="text-center">
-              <Icon icon="solar:widget-2-bold" class="text-lg" style="color: var(--color-primary);" />
-              <p class="text-[10px] mt-0.5" style="color: var(--color-primary-light);">
-                {{ availableComponents.find(c => c.id === cell.componentId)?.name ?? '组件' }}
-              </p>
+            <div v-if="cell.componentId" class="text-center w-full h-full overflow-hidden">
+              <!-- 有预览图时显示预览图 -->
+              <img
+                v-if="availableComponents.find(c => c.id === cell.componentId)?.previewImage"
+                :src="availableComponents.find(c => c.id === cell.componentId)!.previewImage"
+                class="w-full h-full object-cover rounded-sm"
+              />
+              <!-- 无预览图时显示图标 -->
+              <template v-else>
+                <Icon icon="solar:widget-2-bold" class="text-lg" style="color: var(--color-primary);" />
+                <p class="text-[10px] mt-0.5" style="color: var(--color-primary-light);">
+                  {{ availableComponents.find(c => c.id === cell.componentId)?.name ?? '组件' }}
+                </p>
+              </template>
             </div>
             <Icon v-else icon="solar:add-circle-linear" class="text-lg" style="color: var(--color-text-dim);" />
           </div>

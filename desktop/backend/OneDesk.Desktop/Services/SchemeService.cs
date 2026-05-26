@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using OneDeck.Desktop.Models;
+using OneDesk.Desktop.Models;
 
-namespace OneDeck.Desktop.Services;
+namespace OneDesk.Desktop.Services;
 
 /// <summary>
 /// 方案管理服务

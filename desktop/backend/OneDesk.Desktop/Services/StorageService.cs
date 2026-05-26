@@ -2,10 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
-using OneDeck.Desktop.Models;
+using OneDesk.Desktop.Models;
 using Microsoft.Data.Sqlite;
 
-namespace OneDeck.Desktop.Services;
+namespace OneDesk.Desktop.Services;
 
 /// <summary>
 /// 存储服务
@@ -20,9 +20,9 @@ public class StorageService
     public StorageService()
     {
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        var dir = Path.Combine(appData, "OneDeck");
+        var dir = Path.Combine(appData, "OneDesk");
         Directory.CreateDirectory(dir);
-        _dbPath = Path.Combine(dir, "onedeck.db");
+        _dbPath = Path.Combine(dir, "onedesk.db");
     }
 
     public async Task InitializeAsync()

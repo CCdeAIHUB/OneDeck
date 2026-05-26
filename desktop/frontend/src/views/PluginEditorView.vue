@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import { usePluginStore } from '@/stores/plugins'
+import { useNotificationStore } from '@/stores/notification'
+import CodeEditor from '@/components/CodeEditor.vue'
 import { useRoute, useRouter } from 'vue-router'
 import { computed, ref, watch } from 'vue'
 
 const route = useRoute()
 const router = useRouter()
 const pluginStore = usePluginStore()
+const notify = useNotificationStore()
 
 const pluginId = computed(() => route.params.id as string)
 const plugin = computed(() => pluginStore.plugins.find(p => p.id === pluginId.value))
@@ -27,7 +30,6 @@ const activeFile = computed(() => files.value.find(f => f.id === activeFileId.va
 const pluginName = ref('')
 const pluginDescription = ref('')
 const pluginAuthor = ref('')
-const showHelp = ref(false)
 
 // 初始化默认文件
 watch(plugin, (p) => {
@@ -59,6 +61,20 @@ function addFile() {
   }
   files.value.push(file)
   activeFileId.value = file.id
+}
+
+function addFolder() {
+  const name = prompt('输入文件夹名称')
+  if (!name) return
+  // 创建一个占位文件来表示文件夹
+  const file: ProjectFile = {
+    id: crypto.randomUUID().slice(0, 8),
+    name: `${name}/`,
+    path: `/${name}/`,
+    content: '',
+    language: 'js',
+  }
+  files.value.push(file)
 }
 
 function deleteFile(fileId: string) {
@@ -108,7 +124,7 @@ function save() {
       author: pluginAuthor.value,
     }
   }
-  // TODO: 保存文件内容到后端
+  notify.success('插件已保存')
 }
 
 function exportPlugin() {
@@ -133,22 +149,59 @@ function goBack() {
   router.push('/plugins')
 }
 
-// JSAPI 帮助列表
+/** 打开帮助窗口 */
+function openHelp() {
+  const apiItems = jsApiHelp.map(a => {
+    const p = a.platform as string
+    const tagColor = p === 'pc' ? '#3b82f6' : p === 'mobile' ? '#10b981' : '#f59e0b'
+    const tagBg = p === 'pc' ? '#3b82f620' : p === 'mobile' ? '#10b98120' : '#f59e0b20'
+    const tagText = p === 'pc' ? 'PC' : p === 'mobile' ? '移动端' : '双端'
+    return `<div style="background:#1f2937;border-radius:8px;padding:10px 14px;margin:8px 0;display:flex;justify-content:space-between;align-items:center"><span style="font-family:monospace;color:#3b82f6;font-size:13px">${a.api}</span><span style="color:#9ca3af;font-size:12px">${a.desc} <span style="font-size:10px;padding:2px 6px;border-radius:4px;margin-left:6px;background:${tagBg};color:${tagColor}">${tagText}</span></span></div>`
+  }).join('')
+
+  const guideItems = devGuide.map(g => {
+    return `<h4 style="color:#e5e7eb;margin:16px 0 4px">${g.title}</h4><pre style="background:#030712;border-radius:8px;padding:14px;overflow-x:auto;font-size:12px;color:#d1d5db">${g.code.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>`
+  }).join('')
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>OneDesk 插件开发帮助</title><style>body{font-family:system-ui,sans-serif;margin:0;padding:24px;background:#111827;color:#f9fafb;font-size:14px;line-height:1.6}h2{color:#3b82f6;margin-top:0}h3{color:#93c5fd}</style></head><body><h2>OneDesk 插件开发帮助</h2><h3>可用 JSAPI</h3>${apiItems}<h3>开发指引</h3>${guideItems}</body></html>`
+  const w = window.open('', '_blank', 'width=600,height=700')
+  if (w) { w.document.write(html); w.document.close() }
+}
+
+// JSAPI 帮助列表 — 区分 PC 端和移动端
 const jsApiHelp = [
-  { api: 'device.battery', desc: '电池信息（电量、充电状态）' },
-  { api: 'device.network', desc: '网络状态（类型、信号）' },
-  { api: 'device.screen', desc: '屏幕信息（宽高、DPI）' },
-  { api: 'device.storage', desc: '存储信息（总量、可用）' },
-  { api: 'device.memory', desc: '内存信息（总量、可用）' },
-  { api: 'device.model', desc: '设备型号' },
-  { api: 'location.current', desc: '当前位置（经纬度）' },
-  { api: 'clipboard.read', desc: '读取剪贴板内容' },
-  { api: 'network.status', desc: '网络连接状态' },
-  { api: 'storage.get', desc: '读取存储数据' },
-  { api: 'storage.set', desc: '写入存储数据' },
-  { api: 'notification.send', desc: '发送通知' },
-  { api: 'file.read', desc: '读取文件' },
-  { api: 'file.write', desc: '写入文件' },
+  // PC 端独有
+  { api: 'pc.processList', desc: '获取进程列表', platform: 'pc' },
+  { api: 'pc.processMemory', desc: '读取进程内存', platform: 'pc' },
+  { api: 'pc.windowInfo', desc: '读取窗口信息', platform: 'pc' },
+  { api: 'pc.clipboard.read', desc: '读取剪贴板', platform: 'pc' },
+  { api: 'pc.clipboard.write', desc: '写入剪贴板', platform: 'pc' },
+  { api: 'pc.screenshot', desc: '截取屏幕', platform: 'pc' },
+  { api: 'pc.keyEvent', desc: '模拟按键事件', platform: 'pc' },
+  { api: 'pc.mouseEvent', desc: '模拟鼠标事件', platform: 'pc' },
+  { api: 'pc.systemInfo', desc: '系统信息', platform: 'pc' },
+  { api: 'pc.file.read', desc: '读取本地文件', platform: 'pc' },
+  { api: 'pc.file.write', desc: '写入本地文件', platform: 'pc' },
+  { api: 'pc.app.launch', desc: '启动应用程序', platform: 'pc' },
+  // 移动端独有
+  { api: 'mobile.battery', desc: '电池信息', platform: 'mobile' },
+  { api: 'mobile.screen', desc: '屏幕信息', platform: 'mobile' },
+  { api: 'mobile.vibrate', desc: '震动控制', platform: 'mobile' },
+  { api: 'mobile.flashlight', desc: '手电筒', platform: 'mobile' },
+  { api: 'mobile.gyroscope', desc: '陀螺仪', platform: 'mobile' },
+  { api: 'mobile.accelerometer', desc: '加速度计', platform: 'mobile' },
+  { api: 'mobile.gps', desc: 'GPS定位', platform: 'mobile' },
+  { api: 'mobile.camera', desc: '摄像头', platform: 'mobile' },
+  { api: 'mobile.sensors', desc: '传感器', platform: 'mobile' },
+  // 双端通用
+  { api: 'device.info', desc: '设备基本信息', platform: 'both' },
+  { api: 'device.network', desc: '网络状态', platform: 'both' },
+  { api: 'storage.get', desc: '读取数据', platform: 'both' },
+  { api: 'storage.set', desc: '写入数据', platform: 'both' },
+  { api: 'notification.show', desc: '系统通知', platform: 'both' },
+  { api: 'http.get', desc: 'HTTP GET', platform: 'both' },
+  { api: 'http.post', desc: 'HTTP POST', platform: 'both' },
+  { api: 'websocket.connect', desc: 'WebSocket连接', platform: 'both' },
 ]
 
 const devGuide = [
@@ -192,10 +245,15 @@ const devGuide = [
         <div class="flex items-center justify-between">
           <h3 class="text-sm font-semibold" style="color: var(--color-text-muted);">项目文件</h3>
           <div class="flex items-center gap-1">
-            <button @click="importFolder" class="text-xs" style="color: var(--color-primary);" title="导入文件夹">
-              <Icon icon="solar:folder-open-bold" class="text-sm" />
+            <button @click="addFolder" class="text-xs" style="color: var(--color-primary);" title="新建文件夹">
+              <Icon icon="solar:folder-with-files-bold" class="text-sm" />
             </button>
-            <button @click="addFile" class="text-xs" style="color: var(--color-primary);" title="新建文件">+</button>
+            <button @click="importFolder" class="text-xs" style="color: var(--color-primary);" title="导入文件夹">
+              <Icon icon="solar:import-bold" class="text-sm" />
+            </button>
+            <button @click="addFile" class="text-xs" style="color: var(--color-primary);" title="新建文件">
+              <Icon icon="solar:add-circle-bold" class="text-sm" />
+            </button>
           </div>
         </div>
 
@@ -221,9 +279,9 @@ const devGuide = [
           <Icon icon="solar:download-bold" class="inline mr-1" />导出
         </button>
       </div>
-      <button @click="showHelp = !showHelp" class="w-full px-3 py-2 rounded-lg text-sm transition-colors border flex items-center justify-center gap-1" style="border-color: var(--color-border); color: var(--color-primary);">
+      <button @click="openHelp" class="w-full px-3 py-2 rounded-lg text-sm transition-colors border flex items-center justify-center gap-1" style="border-color: var(--color-border); color: var(--color-primary);">
         <Icon icon="solar:question-circle-bold" class="text-base" />
-        {{ showHelp ? '关闭帮助' : '开发帮助' }}
+        开发帮助
       </button>
     </div>
 
@@ -238,12 +296,10 @@ const devGuide = [
       </div>
 
       <div class="flex-1 min-h-0">
-        <textarea
+        <CodeEditor
           v-if="activeFile"
           v-model="activeFile.content"
-          class="w-full h-full rounded-xl p-4 font-mono text-sm resize-none focus:outline-none"
-          style="background-color: var(--color-bg-card); border: 1px solid var(--color-border); color: var(--color-text);"
-          spellcheck="false"
+          :language="activeFile.language === 'vue' ? 'vue' : activeFile.language === 'json' ? 'json' : activeFile.language === 'css' ? 'css' : activeFile.language === 'ts' ? 'typescript' : 'javascript'"
         />
         <div v-else class="flex items-center justify-center h-full rounded-xl" style="background-color: var(--color-bg-card); border: 1px solid var(--color-border); color: var(--color-text-dim);">
           <p class="text-sm">请选择或创建文件</p>
@@ -251,26 +307,7 @@ const devGuide = [
       </div>
     </div>
 
-    <!-- 右侧：帮助面板 -->
-    <div v-if="showHelp" class="w-80 shrink-0 overflow-y-auto space-y-4">
-      <!-- JSAPI 列表 -->
-      <div class="rounded-xl p-4 space-y-2 border" style="background-color: var(--color-bg-card); border-color: var(--color-border);">
-        <h3 class="text-sm font-semibold" style="color: var(--color-text-muted);">可用 JSAPI</h3>
-        <div v-for="api in jsApiHelp" :key="api.api" class="px-2 py-1.5 rounded" style="background-color: var(--color-bg-surface);">
-          <p class="text-xs font-mono" style="color: var(--color-primary);">{{ api.api }}</p>
-          <p class="text-xs" style="color: var(--color-text-dim);">{{ api.desc }}</p>
-        </div>
-      </div>
-
-      <!-- 开发指引 -->
-      <div class="rounded-xl p-4 space-y-3 border" style="background-color: var(--color-bg-card); border-color: var(--color-border);">
-        <h3 class="text-sm font-semibold" style="color: var(--color-text-muted);">开发指引</h3>
-        <div v-for="guide in devGuide" :key="guide.title" class="space-y-1">
-          <p class="text-xs font-semibold" style="color: var(--color-text);">{{ guide.title }}</p>
-          <pre class="text-[10px] font-mono p-2 rounded overflow-x-auto" style="background-color: var(--color-bg-surface); color: var(--color-text-muted);">{{ guide.code }}</pre>
-        </div>
-      </div>
-    </div>
+    <!-- 右侧区域已移除，帮助改为独立窗口 -->
   </div>
 
   <div v-else class="text-center py-20" style="color: var(--color-text-dim);">

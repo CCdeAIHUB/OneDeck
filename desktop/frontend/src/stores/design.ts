@@ -53,8 +53,12 @@ export interface ComponentDesign {
   scriptCode: string
   /** CSS 样式代码 */
   styleCode: string
+  /** 脚本语法: setup 或 options */
+  scriptSyntax: 'setup' | 'options'
   /** 静态资源列表 */
   assets: ComponentAsset[]
+  /** 自动截图的预览封面 (base64 data URL) */
+  previewImage: string
   createdAt: string
   updatedAt: string
 }
@@ -249,9 +253,11 @@ export const useDesignStore = defineStore('design', () => {
       name: partial?.name ?? '新组件',
       description: partial?.description ?? '',
       templateCode: partial?.templateCode ?? `<div class="comp">\n  <span>{{ message }}</span>\n</div>`,
-      scriptCode: partial?.scriptCode ?? `export default {\n  data() {\n    return { message: 'Hello' }\n  }\n}`,
+      scriptCode: partial?.scriptCode ?? `import { ref } from 'vue'\n\nconst message = ref('Hello')`,
       styleCode: partial?.styleCode ?? `.comp {\n  display: flex;\n  align-items: center;\n  justify-content: center;\n}`,
       assets: partial?.assets ?? [],
+      previewImage: partial?.previewImage ?? '',
+      scriptSyntax: partial?.scriptSyntax ?? 'setup',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }

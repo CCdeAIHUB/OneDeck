@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace OneDeck.Desktop.Services;
+namespace OneDesk.Desktop.Services;
 
 /// <summary>
 /// JSAPI 服务
@@ -105,7 +105,7 @@ public class JsApiService
             {
                 platform = "desktop",
                 osVersion = Environment.OSVersion.ToString(),
-                model = "OneDeck Desktop",
+                model = "OneDesk Desktop",
                 screenResolution = new { width = 1920, height = 1080 }
             });
         });

@@ -75,7 +75,7 @@ function exportParams() {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `onedeck-params-${Date.now()}.json`
+  a.download = `onedesk-params-${Date.now()}.json`
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -240,12 +240,42 @@ function formatValue(value: unknown): string {
         </div>
         <div>
           <label class="text-sm" style="color: var(--color-text-muted);">值</label>
+          <!-- number: 数字输入 -->
+          <input
+            v-if="newValueType === 'number'"
+            v-model.number="newValue"
+            type="number"
+            step="any"
+            class="w-full mt-1 px-3 py-2 rounded-lg text-sm font-mono focus:outline-none"
+            style="background-color: var(--color-bg-surface); border: 1px solid var(--color-border); color: var(--color-text);"
+            placeholder="0"
+          />
+          <!-- boolean: 选择框 -->
+          <select
+            v-else-if="newValueType === 'boolean'"
+            v-model="newValue"
+            class="w-full mt-1 px-3 py-2 rounded-lg text-sm focus:outline-none"
+            style="background-color: var(--color-bg-surface); border: 1px solid var(--color-border); color: var(--color-text);"
+          >
+            <option value="true">true</option>
+            <option value="false">false</option>
+          </select>
+          <!-- object: textarea -->
           <textarea
+            v-else-if="newValueType === 'object'"
             v-model="newValue"
             rows="3"
             class="w-full mt-1 px-3 py-2 rounded-lg text-sm font-mono focus:outline-none resize-none"
             style="background-color: var(--color-bg-surface); border: 1px solid var(--color-border); color: var(--color-text);"
-            :placeholder="newValueType === 'object' ? '{&quot;key&quot;: &quot;value&quot;}' : newValueType === 'boolean' ? 'true / false' : '输入值...'"
+            placeholder='{ "key": "value" }'
+          />
+          <!-- string: 文本输入 -->
+          <input
+            v-else
+            v-model="newValue"
+            class="w-full mt-1 px-3 py-2 rounded-lg text-sm focus:outline-none"
+            style="background-color: var(--color-bg-surface); border: 1px solid var(--color-border); color: var(--color-text);"
+            placeholder="输入文本值..."
           />
         </div>
         <div class="flex gap-3 justify-end">

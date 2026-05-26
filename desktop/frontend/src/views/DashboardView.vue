@@ -79,7 +79,7 @@ const stats = computed(() => ({
       <div v-if="deviceStore.devices.length === 0" class="text-center py-12" style="color: var(--color-text-dim);">
         <Icon icon="solar:smartphone-bold" class="text-4xl mb-2 mx-auto block" />
         <p>暂无已连接设备</p>
-        <p class="text-sm">在移动端打开 OneDeck 并连接到此桌面端</p>
+        <p class="text-sm">在移动端打开 OneDesk 并连接到此桌面端</p>
       </div>
     </div>
 

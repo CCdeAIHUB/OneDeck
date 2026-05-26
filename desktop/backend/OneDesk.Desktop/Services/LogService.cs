@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace OneDeck.Desktop.Services;
+namespace OneDesk.Desktop.Services;
 
 /// <summary>
 /// 日志服务

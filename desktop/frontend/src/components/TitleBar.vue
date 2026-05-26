@@ -2,16 +2,35 @@
 import { Icon } from '@iconify/vue'
 import { useThemeStore } from '@/stores/theme'
 import { useDeviceStore } from '@/stores/devices'
-import { computed } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 
 const themeStore = useThemeStore()
 const deviceStore = useDeviceStore()
 
 const isMac = computed(() => navigator.userAgent.includes('Mac'))
-const isMaximized = computed(() => false)
+const isMaximized = ref(false)
 
 const currentDevice = computed(() => deviceStore.selectedDevice)
 const onlineDevices = computed(() => deviceStore.onlineDevices)
+
+// 监听窗口最大化状态（通过 C# 后端消息同步）
+function handleWindowMessage(e: MessageEvent) {
+  if (e.data?.type === 'window:state') {
+    isMaximized.value = e.data.maximized
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('message', handleWindowMessage)
+  // 请求初始窗口状态
+  if (window.chrome?.webview) {
+    window.chrome.webview.postMessage('window:getState')
+  }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('message', handleWindowMessage)
+})
 
 function minimize() {
   if (window.chrome?.webview) window.chrome.webview.postMessage('window:minimize')
@@ -25,10 +44,26 @@ function close() {
 function selectDevice(id: string | null) {
   deviceStore.selectDevice(id)
 }
+
+// 标题栏拖拽：通知 C# 后端进入窗口拖拽模式
+function startDrag(e: MouseEvent) {
+  // 只响应主按键（左键），且不是在按钮/选择框等交互元素上
+  if (e.button !== 0) return
+  const target = e.target as HTMLElement
+  if (target.closest('button, select, input, a')) return
+  if (window.chrome?.webview) window.chrome.webview.postMessage('window:drag')
+}
+
+// 双击标题栏切换最大化
+function onTitlebarDblClick(e: MouseEvent) {
+  const target = e.target as HTMLElement
+  if (target.closest('button, select, input, a')) return
+  toggleMaximize()
+}
 </script>
 
 <template>
-  <div class="titlebar-drag flex items-center justify-between shrink-0 border-b" style="height: var(--titlebar-height); background-color: var(--color-bg-card); border-color: var(--color-border-subtle);">
+  <div class="titlebar-drag flex items-center justify-between shrink-0 border-b" style="height: var(--titlebar-height); background-color: var(--color-bg-card); border-color: var(--color-border-subtle);" @mousedown="startDrag" @dblclick="onTitlebarDblClick">
     <!-- macOS: 左侧红绿灯 -->
     <template v-if="isMac">
       <div class="titlebar-no-drag flex items-center gap-2 pl-3 traffic-lights">
@@ -64,7 +99,7 @@ function selectDevice(id: string | null) {
     <template v-else>
       <div class="titlebar-no-drag flex items-center gap-2 pl-3">
         <Icon icon="solar:widget-bold" style="color: var(--color-primary);" class="text-base" />
-        <span class="text-xs font-semibold tracking-wide" style="color: var(--color-text-muted);">OneDeck</span>
+        <span class="text-xs font-semibold tracking-wide" style="color: var(--color-text-muted);">OneDesk</span>
       </div>
 
       <div class="flex-1" />
@@ -113,12 +148,14 @@ function selectDevice(id: string | null) {
           @mouseenter="($event.target as HTMLElement).style.backgroundColor = 'var(--color-bg-hover)'"
           @mouseleave="($event.target as HTMLElement).style.backgroundColor = 'transparent'"
         >
+          <!-- 最大化状态：显示还原图标（两个重叠方块） -->
           <svg v-if="isMaximized" width="10" height="10" viewBox="0 0 10 10">
-            <rect x="2" y="0" width="8" height="8" fill="none" stroke="currentColor" stroke-width="1"/>
-            <rect x="0" y="2" width="8" height="8" fill="var(--color-bg-card)" stroke="currentColor" stroke-width="1"/>
+            <rect x="2.5" y="0" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1"/>
+            <rect x="0" y="2.5" width="7" height="7" fill="var(--color-bg-card)" stroke="currentColor" stroke-width="1"/>
           </svg>
+          <!-- 正常状态：显示最大化图标（单方块） -->
           <svg v-else width="10" height="10" viewBox="0 0 10 10">
-            <rect x="0" y="0" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1"/>
+            <rect x="0.5" y="0.5" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1"/>
           </svg>
         </button>
         <!-- 关闭 -->

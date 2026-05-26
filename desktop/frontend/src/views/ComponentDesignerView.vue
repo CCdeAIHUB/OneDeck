@@ -2,6 +2,8 @@
 import { Icon } from '@iconify/vue'
 import { useDesignStore, type ComponentAsset } from '@/stores/design'
 import { useDeviceStore } from '@/stores/devices'
+import { useNotificationStore } from '@/stores/notification'
+import CodeEditor from '@/components/CodeEditor.vue'
 import { useRoute, useRouter } from 'vue-router'
 import { computed, ref, watch } from 'vue'
 
@@ -9,6 +11,7 @@ const route = useRoute()
 const router = useRouter()
 const designStore = useDesignStore()
 const deviceStore = useDeviceStore()
+const notify = useNotificationStore()
 
 const compId = computed(() => route.params.id as string)
 const comp = computed(() => designStore.components.find((c) => c.id === compId.value))
@@ -21,7 +24,7 @@ const styleCode = ref('')
 const activeTab = ref<'template' | 'script' | 'style'>('template')
 const previewHtml = ref('')
 const scriptSyntax = ref<'options' | 'setup'>('setup')
-const showHelp = ref(false)
+const previewRef = ref<HTMLElement | null>(null)
 
 // 默认代码模板
 const SETUP_DEFAULT = `import { ref, onUnmounted } from 'vue'\nimport { useSharedParams } from '@/stores/sharedParams'\n\nconst message = ref('Hello')\nconst sharedParams = useSharedParams()\n\n// 通过 JSAPI 获取设备数据\n// const battery = ref(null)\n// async function fetchBattery() {\n//   battery.value = await context.callApi('device.battery')\n// }`
@@ -60,6 +63,7 @@ watch(comp, (c) => {
   templateCode.value = c.templateCode
   scriptCode.value = c.scriptCode
   styleCode.value = c.styleCode
+  scriptSyntax.value = c.scriptSyntax ?? 'setup'
 }, { immediate: true })
 
 // 监听代码变化标记用户编辑
@@ -79,6 +83,11 @@ function switchScriptSyntax(newSyntax: 'options' | 'setup') {
 
 function save() {
   if (!comp.value) return
+  // 名称冲突检测
+  if (designStore.checkDuplicateName(compName.value, 'component', compId.value)) {
+    const existingNames = designStore.components.map(c => c.name)
+    compName.value = designStore.generateUniqueName(compName.value, existingNames)
+  }
   designStore.updateComponent({
     ...comp.value,
     name: compName.value,
@@ -86,7 +95,9 @@ function save() {
     templateCode: templateCode.value,
     scriptCode: scriptCode.value,
     styleCode: styleCode.value,
+    scriptSyntax: scriptSyntax.value,
   })
+  notify.success('组件已保存')
 }
 
 function addAsset() {
@@ -148,11 +159,54 @@ function generateDataImportCode(): string {
 }
 
 function generatePreview() {
-  const html = `<div style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:#111827;color:white;"><style>${styleCode.value}</style><div class="comp">${templateCode.value.replace(/\{\{.*?\}\}/g, '预览')}</div></div>`
+  const html = `<div style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:#111827;color:white;overflow:hidden;"><style>${styleCode.value}</style><div class="comp">${templateCode.value.replace(/\{\{.*?\}\}/g, '预览')}</div></div>`
   previewHtml.value = html
 }
 
+/** 自动截图：将预览区域渲染为 canvas 截图并保存为组件封面 */
+async function capturePreview() {
+  if (!previewRef.value || !comp.value) return
+  try {
+    const { toCanvas } = await import('html-to-image')
+    const canvas = await toCanvas(previewRef.value, {
+      backgroundColor: '#111827',
+      pixelRatio: 1,
+    })
+    // 删除旧截图，保存新截图
+    const dataUrl = canvas.toDataURL('image/png')
+    designStore.updateComponent({
+      ...comp.value,
+      previewImage: dataUrl,
+    })
+  } catch {
+    // html-to-image 不可用时忽略（沙箱环境下可能受限）
+  }
+}
+
+function onPreviewGenerated() {
+  generatePreview()
+  // 延迟截图，等待 DOM 渲染
+  setTimeout(() => capturePreview(), 300)
+}
+
 function goBack() { router.push('/components') }
+
+/** 打开帮助窗口 */
+function openHelp() {
+  const apiItems = jsApiHelp.map(a => {
+    const p = (a as any).platform as string | undefined
+    const tagHtml = p ? `<span style="font-size:10px;padding:2px 6px;border-radius:4px;margin-left:6px;background:${p === 'pc' ? '#3b82f620' : p === 'mobile' ? '#10b98120' : '#f59e0b20'};color:${p === 'pc' ? '#3b82f6' : p === 'mobile' ? '#10b981' : '#f59e0b'}">${p === 'pc' ? 'PC' : p === 'mobile' ? '移动端' : '双端'}</span>` : ''
+    return `<div style="background:#1f2937;border-radius:8px;padding:10px 14px;margin:8px 0;display:flex;justify-content:space-between;align-items:center"><span style="font-family:monospace;color:#3b82f6;font-size:13px">${a.api}</span><span style="color:#9ca3af;font-size:12px">${a.desc}${tagHtml}</span></div>`
+  }).join('')
+
+  const guideItems = devGuide.map(g => {
+    return `<h4 style="color:#e5e7eb;margin:16px 0 4px">${g.title}</h4><pre style="background:#030712;border-radius:8px;padding:14px;overflow-x:auto;font-size:12px;color:#d1d5db">${g.code.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>`
+  }).join('')
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>OneDesk 开发帮助</title><style>body{font-family:system-ui,sans-serif;margin:0;padding:24px;background:#111827;color:#f9fafb;font-size:14px;line-height:1.6}h2{color:#3b82f6;margin-top:0}h3{color:#93c5fd}</style></head><body><h2>OneDesk 组件开发帮助</h2><h3>可用 JSAPI</h3>${apiItems}<h3>开发指引</h3>${guideItems}</body></html>`
+  const w = window.open('', '_blank', 'width=600,height=700')
+  if (w) { w.document.write(html); w.document.close() }
+}
 
 // 预览比例 - 基于选中设备
 const previewAspect = computed(() => {
@@ -163,17 +217,57 @@ const previewAspect = computed(() => {
   return '9/16'
 })
 
-// JSAPI 帮助
+// JSAPI 帮助 — 明确区分 PC 端和移动端
 const jsApiHelp = [
-  { api: 'device.battery', desc: '电池信息' },
-  { api: 'device.network', desc: '网络状态' },
-  { api: 'device.screen', desc: '屏幕信息' },
-  { api: 'device.storage', desc: '存储信息' },
-  { api: 'device.memory', desc: '内存信息' },
-  { api: 'device.model', desc: '设备型号' },
-  { api: 'location.current', desc: '当前位置' },
-  { api: 'clipboard.read', desc: '剪贴板' },
-  { api: 'storage.get/set', desc: '存储数据' },
+  // ===== PC 端独有 =====
+  { api: 'pc.processList', desc: '获取进程列表', platform: 'pc' },
+  { api: 'pc.processMemory', desc: '读取进程内存', platform: 'pc' },
+  { api: 'pc.windowInfo', desc: '读取窗口信息（标题/位置）', platform: 'pc' },
+  { api: 'pc.clipboard.read', desc: '读取剪贴板', platform: 'pc' },
+  { api: 'pc.clipboard.write', desc: '写入剪贴板', platform: 'pc' },
+  { api: 'pc.screenshot', desc: '截取屏幕', platform: 'pc' },
+  { api: 'pc.keyEvent', desc: '模拟按键事件', platform: 'pc' },
+  { api: 'pc.mouseEvent', desc: '模拟鼠标事件', platform: 'pc' },
+  { api: 'pc.systemInfo', desc: '系统信息（CPU/内存/磁盘）', platform: 'pc' },
+  { api: 'pc.file.read', desc: '读取本地文件', platform: 'pc' },
+  { api: 'pc.file.write', desc: '写入本地文件', platform: 'pc' },
+  { api: 'pc.file.delete', desc: '删除本地文件', platform: 'pc' },
+  { api: 'pc.file.list', desc: '列出目录文件', platform: 'pc' },
+  { api: 'pc.app.launch', desc: '启动应用程序', platform: 'pc' },
+  { api: 'pc.registry.read', desc: '读取注册表', platform: 'pc' },
+  // ===== 移动端独有 =====
+  { api: 'mobile.battery', desc: '电池信息（电量/充电状态）', platform: 'mobile' },
+  { api: 'mobile.screen', desc: '屏幕信息（宽高/DPI/亮度）', platform: 'mobile' },
+  { api: 'mobile.vibrate', desc: '震动控制', platform: 'mobile' },
+  { api: 'mobile.flashlight', desc: '手电筒开关', platform: 'mobile' },
+  { api: 'mobile.gyroscope', desc: '陀螺仪数据', platform: 'mobile' },
+  { api: 'mobile.accelerometer', desc: '加速度计数据', platform: 'mobile' },
+  { api: 'mobile.gps', desc: 'GPS 定位', platform: 'mobile' },
+  { api: 'mobile.wifi', desc: 'WiFi 信息', platform: 'mobile' },
+  { api: 'mobile.bluetooth', desc: '蓝牙设备列表', platform: 'mobile' },
+  { api: 'mobile.camera', desc: '摄像头（拍照/扫码）', platform: 'mobile' },
+  { api: 'mobile.nfc', desc: 'NFC 读写', platform: 'mobile' },
+  { api: 'mobile.contacts', desc: '通讯录读取', platform: 'mobile' },
+  { api: 'mobile.call', desc: '拨打电话', platform: 'mobile' },
+  { api: 'mobile.sms', desc: '发送短信', platform: 'mobile' },
+  { api: 'mobile.push', desc: '推送通知', platform: 'mobile' },
+  { api: 'mobile.sensors', desc: '传感器数据（温度/湿度/气压）', platform: 'mobile' },
+  // ===== 双端通用 =====
+  { api: 'device.info', desc: '设备基本信息（型号/平台/OS版本）', platform: 'both' },
+  { api: 'device.network', desc: '网络连接状态', platform: 'both' },
+  { api: 'device.storage', desc: '存储空间信息', platform: 'both' },
+  { api: 'device.memory', desc: '内存信息', platform: 'both' },
+  { api: 'notification.show', desc: '显示系统通知', platform: 'both' },
+  { api: 'storage.get', desc: '读取持久化数据', platform: 'both' },
+  { api: 'storage.set', desc: '写入持久化数据', platform: 'both' },
+  { api: 'storage.remove', desc: '删除持久化数据', platform: 'both' },
+  { api: 'storage.keys', desc: '获取所有键名', platform: 'both' },
+  { api: 'storage.clear', desc: '清空持久化数据', platform: 'both' },
+  { api: 'http.get', desc: 'HTTP GET 请求', platform: 'both' },
+  { api: 'http.post', desc: 'HTTP POST 请求', platform: 'both' },
+  { api: 'websocket.connect', desc: 'WebSocket 连接', platform: 'both' },
+  { api: 'crypto.hash', desc: '哈希计算（MD5/SHA）', platform: 'both' },
+  { api: 'crypto.encrypt', desc: '加密/解密数据', platform: 'both' },
 ]
 
 const devGuide = [
@@ -266,9 +360,9 @@ const devGuide = [
       </div>
 
       <!-- 帮助按钮 -->
-      <button @click="showHelp = !showHelp" class="w-full px-3 py-2 rounded-lg text-sm transition-colors border flex items-center justify-center gap-1" style="border-color: var(--color-border); color: var(--color-primary);">
+      <button @click="openHelp" class="w-full px-3 py-2 rounded-lg text-sm transition-colors border flex items-center justify-center gap-1" style="border-color: var(--color-border); color: var(--color-primary);">
         <Icon icon="solar:question-circle-bold" class="text-base" />
-        {{ showHelp ? '关闭帮助' : '开发帮助' }}
+        开发帮助
       </button>
     </div>
 
@@ -280,12 +374,12 @@ const devGuide = [
         </button>
         <div class="flex-1" />
         <button @click="save" class="px-3 py-1.5 rounded-lg text-xs text-white transition-colors" style="background-color: var(--color-primary);">保存</button>
-        <button @click="generatePreview" class="px-3 py-1.5 rounded-lg text-xs text-white transition-colors bg-emerald-600 hover:bg-emerald-500">预览</button>
+        <button @click="onPreviewGenerated" class="px-3 py-1.5 rounded-lg text-xs text-white transition-colors bg-emerald-600 hover:bg-emerald-500">预览</button>
       </div>
       <div class="flex-1 min-h-0">
-        <textarea v-model="templateCode" v-show="activeTab === 'template'" class="w-full h-full rounded-xl p-4 font-mono text-sm resize-none focus:outline-none" style="background-color: var(--color-bg-card); border: 1px solid var(--color-border); color: var(--color-text);" spellcheck="false" placeholder="<div class='comp'>...</div>" />
-        <textarea v-model="scriptCode" v-show="activeTab === 'script'" class="w-full h-full rounded-xl p-4 font-mono text-sm resize-none focus:outline-none" style="background-color: var(--color-bg-card); border: 1px solid var(--color-border); color: var(--color-text);" spellcheck="false" :placeholder="scriptSyntax === 'setup' ? 'setup syntax...' : 'export default { ... }'" />
-        <textarea v-model="styleCode" v-show="activeTab === 'style'" class="w-full h-full rounded-xl p-4 font-mono text-sm resize-none focus:outline-none" style="background-color: var(--color-bg-card); border: 1px solid var(--color-border); color: var(--color-text);" spellcheck="false" placeholder=".comp { ... }" />
+        <CodeEditor v-if="activeTab === 'template'" v-model="templateCode" language="html" />
+        <CodeEditor v-else-if="activeTab === 'script'" v-model="scriptCode" :language="scriptSyntax === 'setup' ? 'typescript' : 'javascript'" />
+        <CodeEditor v-else-if="activeTab === 'style'" v-model="styleCode" language="css" />
       </div>
     </div>
 
@@ -295,9 +389,9 @@ const devGuide = [
       <div class="rounded-xl overflow-hidden border" style="background-color: var(--color-bg-card); border-color: var(--color-border);">
         <div class="flex items-center justify-between px-3 py-2 border-b" style="border-color: var(--color-border-subtle);">
           <h3 class="text-xs font-semibold" style="color: var(--color-text-dim);">预览</h3>
-          <button @click="generatePreview" style="color: var(--color-primary);"><Icon icon="solar:refresh-bold" class="text-sm" /></button>
+          <button @click="onPreviewGenerated" style="color: var(--color-primary);"><Icon icon="solar:refresh-bold" class="text-sm" /></button>
         </div>
-        <div :style="{ aspectRatio: previewAspect }" class="flex items-center justify-center" style="background-color: var(--color-bg);">
+        <div ref="previewRef" :style="{ aspectRatio: previewAspect }" class="flex items-center justify-center" style="background-color: var(--color-bg);">
           <div v-if="previewHtml" class="w-full h-full" v-html="previewHtml" />
           <div v-else class="text-center" style="color: var(--color-text-dim);">
             <Icon icon="solar:eye-bold" class="text-3xl mb-2 mx-auto block" />
@@ -306,20 +400,6 @@ const devGuide = [
         </div>
         <div class="px-3 py-1.5 text-xs" style="color: var(--color-text-dim); border-top: 1px solid var(--color-border-subtle);">
           {{ deviceStore.selectedDevice ? `${deviceStore.selectedDevice.deviceName} (${deviceStore.selectedDevice.screenWidth}x${deviceStore.selectedDevice.screenHeight})` : '默认比例 9:16' }}
-        </div>
-      </div>
-
-      <!-- 帮助面板 -->
-      <div v-if="showHelp" class="rounded-xl p-4 space-y-3 border" style="background-color: var(--color-bg-card); border-color: var(--color-border);">
-        <h3 class="text-sm font-semibold" style="color: var(--color-text-muted);">可用 JSAPI</h3>
-        <div v-for="api in jsApiHelp" :key="api.api" class="px-2 py-1 rounded" style="background-color: var(--color-bg-surface);">
-          <p class="text-xs font-mono" style="color: var(--color-primary);">{{ api.api }}</p>
-          <p class="text-xs" style="color: var(--color-text-dim);">{{ api.desc }}</p>
-        </div>
-        <h3 class="text-sm font-semibold pt-2" style="color: var(--color-text-muted);">开发指引</h3>
-        <div v-for="guide in devGuide" :key="guide.title" class="space-y-1">
-          <p class="text-xs font-semibold" style="color: var(--color-text);">{{ guide.title }}</p>
-          <pre class="text-[10px] font-mono p-2 rounded overflow-x-auto" style="background-color: var(--color-bg-surface); color: var(--color-text-muted);">{{ guide.code }}</pre>
         </div>
       </div>
     </div>
