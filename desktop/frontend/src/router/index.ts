@@ -62,13 +62,13 @@ const router = createRouter({
       path: '/plugins',
       name: 'plugins',
       component: () => import('@/views/PluginsView.vue'),
-      meta: { title: '插件', icon: 'solar:plugin-bold' },
+      meta: { title: '插件', icon: 'solar:puzzle-bold' },
     },
     {
-      path: '/logs',
-      name: 'logs',
-      component: () => import('@/views/LogsView.vue'),
-      meta: { title: '日志', icon: 'solar:document-text-bold' },
+      path: '/shared-params',
+      name: 'shared-params',
+      component: () => import('@/views/SharedParamsView.vue'),
+      meta: { title: '公共参数库', icon: 'solar:database-bold' },
     },
     {
       path: '/settings',

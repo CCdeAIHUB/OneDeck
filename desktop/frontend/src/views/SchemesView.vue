@@ -3,25 +3,61 @@ import { Icon } from '@iconify/vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { useSchemeStore } from '@/stores/schemes'
 import { useRouter } from 'vue-router'
+import { ref } from 'vue'
 
 const schemeStore = useSchemeStore()
 const router = useRouter()
 
+const showCreateDialog = ref(false)
+const newSchemeName = ref('')
+
 function createScheme() {
-  // TODO: 打开创建方案弹窗
+  showCreateDialog.value = true
+  newSchemeName.value = ''
+}
+
+function confirmCreate() {
+  const name = newSchemeName.value.trim() || '新方案'
+  const scheme = {
+    id: crypto.randomUUID().slice(0, 8),
+    name,
+    targetDeviceId: '',
+    layout: {
+      type: 'grid' as const,
+      columns: 3,
+      rows: 4,
+      pages: [],
+    },
+    plugins: [],
+    version: 1,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }
+  schemeStore.addScheme(scheme)
+  showCreateDialog.value = false
+  router.push(`/schemes/${scheme.id}/editor`)
 }
 
 function editScheme(id: string) {
   router.push(`/schemes/${id}/editor`)
 }
+
+function deleteScheme(id: string) {
+  if (confirm('确定删除该方案？')) {
+    schemeStore.removeScheme(id)
+  }
+}
 </script>
 
 <template>
   <div>
-    <PageHeader title="方案管理" subtitle="设计移动端界面方案" icon="solar:widget-bold">
+    <PageHeader title="方案管理" subtitle="设计移动端界面方案" icon="solar:layers-bold">
       <template #actions>
         <button
-          class="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm transition-colors"
+          class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors text-white"
+          style="background-color: var(--color-primary);"
+          @mouseover="($event.target as HTMLElement).style.backgroundColor = 'var(--color-primary-hover)'"
+          @mouseout="($event.target as HTMLElement).style.backgroundColor = 'var(--color-primary)'"
           @click="createScheme"
         >
           <Icon icon="solar:add-circle-bold" class="text-base" />
@@ -31,11 +67,12 @@ function editScheme(id: string) {
     </PageHeader>
 
     <div v-if="schemeStore.schemes.length === 0" class="text-center py-20">
-      <Icon icon="solar:widget-bold" class="text-6xl text-gray-700 mb-4 mx-auto block" />
-      <h3 class="text-lg font-semibold text-gray-400 mb-2">暂无方案</h3>
-      <p class="text-sm text-gray-500">创建一个方案，为移动端设计界面布局和交互逻辑</p>
+      <Icon icon="solar:layers-bold" class="text-6xl mb-4 mx-auto block" style="color: var(--color-text-dim);" />
+      <h3 class="text-lg font-semibold mb-2" style="color: var(--color-text-muted);">暂无方案</h3>
+      <p class="text-sm" style="color: var(--color-text-dim);">创建一个方案，为移动端设计界面布局和交互逻辑</p>
       <button
-        class="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm transition-colors"
+        class="mt-4 px-4 py-2 rounded-lg text-sm text-white transition-colors"
+        style="background-color: var(--color-primary);"
         @click="createScheme"
       >
         创建第一个方案
@@ -46,23 +83,62 @@ function editScheme(id: string) {
       <div
         v-for="scheme in schemeStore.schemes"
         :key="scheme.id"
-        class="bg-gray-900 border border-gray-800 rounded-xl p-5 hover:border-indigo-500/50 transition-all duration-200 cursor-pointer"
+        class="rounded-xl p-5 cursor-pointer transition-all duration-200 border hover:border-blue-500/50"
+        style="background-color: var(--color-bg-card); border-color: var(--color-border);"
         @click="editScheme(scheme.id)"
       >
         <div class="flex items-start justify-between mb-3">
           <h3 class="font-semibold">{{ scheme.name }}</h3>
-          <span class="text-xs text-gray-500">v{{ scheme.version }}</span>
+          <span class="text-xs" style="color: var(--color-text-dim);">v{{ scheme.version }}</span>
         </div>
 
-        <div class="text-xs text-gray-400 space-y-1">
+        <div class="text-xs space-y-1" style="color: var(--color-text-muted);">
           <p>布局：{{ scheme.layout.type }}（{{ scheme.layout.columns }}×{{ scheme.layout.rows }}）</p>
           <p>页面数：{{ scheme.layout.pages.length }}</p>
           <p>插件数：{{ scheme.plugins.length }}</p>
         </div>
 
-        <div class="flex items-center justify-between mt-4 pt-3 border-t border-gray-800 text-xs text-gray-500">
+        <div class="flex items-center justify-between mt-4 pt-3 text-xs" style="border-top: 1px solid var(--color-border-subtle); color: var(--color-text-dim);">
           <span>更新于 {{ new Date(scheme.updatedAt).toLocaleDateString() }}</span>
-          <Icon icon="solar:pen-bold" class="text-sm text-indigo-400" />
+          <div class="flex items-center gap-2">
+            <Icon icon="solar:pen-bold" class="text-sm" style="color: var(--color-primary);" />
+            <button class="hover:text-red-400 transition-colors" @click.stop="deleteScheme(scheme.id)">
+              <Icon icon="solar:trash-bin-trash-bold" class="text-sm" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 创建方案对话框 -->
+    <div v-if="showCreateDialog" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showCreateDialog = false">
+      <div class="rounded-xl p-6 w-96 space-y-4" style="background-color: var(--color-bg-card);">
+        <h3 class="text-lg font-bold">新建方案</h3>
+        <div>
+          <label class="text-sm" style="color: var(--color-text-muted);">方案名称</label>
+          <input
+            v-model="newSchemeName"
+            class="w-full mt-1 px-3 py-2 rounded-lg text-sm focus:outline-none"
+            style="background-color: var(--color-bg-surface); border: 1px solid var(--color-border); color: var(--color-text);"
+            placeholder="输入方案名称"
+            @keyup.enter="confirmCreate"
+          />
+        </div>
+        <div class="flex gap-3 justify-end">
+          <button
+            class="px-4 py-2 rounded-lg text-sm transition-colors"
+            style="background-color: var(--color-bg-surface); color: var(--color-text-muted);"
+            @click="showCreateDialog = false"
+          >
+            取消
+          </button>
+          <button
+            class="px-4 py-2 rounded-lg text-sm text-white transition-colors"
+            style="background-color: var(--color-primary);"
+            @click="confirmCreate"
+          >
+            创建
+          </button>
         </div>
       </div>
     </div>

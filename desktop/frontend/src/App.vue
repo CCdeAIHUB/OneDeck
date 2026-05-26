@@ -1,13 +1,18 @@
 <script setup lang="ts">
 import TitleBar from '@/components/TitleBar.vue'
 import Sidebar from '@/components/Sidebar.vue'
-import { useRoute } from 'vue-router'
+import { useThemeStore } from '@/stores/theme'
+import { onMounted } from 'vue'
 
-const route = useRoute()
+const themeStore = useThemeStore()
+
+onMounted(() => {
+  themeStore.initTheme()
+})
 </script>
 
 <template>
-  <div class="flex flex-col h-screen">
+  <div class="flex flex-col h-screen" :class="themeStore.getEffectiveTheme()">
     <!-- 自绘标题栏 -->
     <TitleBar />
 
@@ -16,7 +21,7 @@ const route = useRoute()
       <Sidebar />
 
       <!-- 主内容区 -->
-      <main class="flex-1 overflow-y-auto bg-gray-950 p-6">
+      <main class="flex-1 overflow-y-auto p-6" style="background-color: var(--color-bg);">
         <router-view />
       </main>
     </div>
