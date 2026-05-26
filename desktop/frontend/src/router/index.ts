@@ -3,10 +3,7 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 const router = createRouter({
   history: createWebHashHistory(),
   routes: [
-    {
-      path: '/',
-      redirect: '/dashboard',
-    },
+    { path: '/', redirect: '/dashboard' },
     {
       path: '/dashboard',
       name: 'dashboard',
@@ -23,7 +20,31 @@ const router = createRouter({
       path: '/devices/:id',
       name: 'device-detail',
       component: () => import('@/views/DeviceDetailView.vue'),
-      meta: { title: '设备详情', icon: 'solar:smartphone-bold' },
+      meta: { title: '设备详情' },
+    },
+    {
+      path: '/pages',
+      name: 'pages',
+      component: () => import('@/views/PagesView.vue'),
+      meta: { title: '页面', icon: 'solar:document-bold' },
+    },
+    {
+      path: '/pages/:id/designer',
+      name: 'page-designer',
+      component: () => import('@/views/PageDesignerView.vue'),
+      meta: { title: '页面设计' },
+    },
+    {
+      path: '/components',
+      name: 'components',
+      component: () => import('@/views/ComponentsView.vue'),
+      meta: { title: '组件', icon: 'solar:widget-2-bold' },
+    },
+    {
+      path: '/components/:id/designer',
+      name: 'component-designer',
+      component: () => import('@/views/ComponentDesignerView.vue'),
+      meta: { title: '组件设计' },
     },
     {
       path: '/schemes',
@@ -35,13 +56,13 @@ const router = createRouter({
       path: '/schemes/:id/editor',
       name: 'scheme-editor',
       component: () => import('@/views/SchemeEditorView.vue'),
-      meta: { title: '方案编辑器', icon: 'solar:widget-bold' },
+      meta: { title: '方案编辑器' },
     },
     {
       path: '/plugins',
       name: 'plugins',
       component: () => import('@/views/PluginsView.vue'),
-      meta: { title: '插件', icon: 'solar:widget-2-bold' },
+      meta: { title: '插件', icon: 'solar:plugin-bold' },
     },
     {
       path: '/logs',

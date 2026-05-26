@@ -6,6 +6,7 @@ node_modules/
 dist/
 bin/
 obj/
+publish/
 *.dll
 *.pdb
 *.exe

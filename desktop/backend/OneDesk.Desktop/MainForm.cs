@@ -1,7 +1,15 @@
 using System;
 using System.Drawing;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Web.WebView2.WinForms;
+using OneDeck.Desktop.Services;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.AspNetCore.Http;
 
 namespace OneDeck.Desktop;
 
@@ -11,14 +19,18 @@ namespace OneDeck.Desktop;
 /// </summary>
 public class MainForm : Form
 {
-    private WebView2 webView;
+    private WebView2? webView;
     private readonly int _httpPort;
+    private readonly int _wsPort;
+    private StorageService? _storageService;
+    private LogService? _logService;
 
-    public MainForm(int httpPort)
+    public MainForm(int httpPort, int wsPort)
     {
         _httpPort = httpPort;
+        _wsPort = wsPort;
         InitializeForm();
-        InitializeWebView();
+        InitializeBackend();
     }
 
     private void InitializeForm()
@@ -28,49 +40,126 @@ public class MainForm : Form
         Size = new Size(1280, 800);
         MinimumSize = new Size(960, 600);
         StartPosition = FormStartPosition.CenterScreen;
+        BackColor = Color.FromArgb(3, 7, 18); // gray-950
 
         // 无边框 - 标题栏由前端 Vue 自行绘制
         FormBorderStyle = FormBorderStyle.None;
         DoubleBuffered = true;
-
-        // 窗口拖拽支持（前端标题栏区域触发拖拽通过 WebView2 消息传递）
     }
 
-    private async void InitializeWebView()
+    private async void InitializeBackend()
     {
-        // 创建 WebView2 控件
-        webView = new WebView2
-        {
-            Dock = DockStyle.Fill
-        };
-        Controls.Add(webView);
-
         try
         {
-            // 初始化 WebView2 运行时
+            // 1. 初始化后端服务
+            _storageService = new StorageService();
+            await _storageService.InitializeAsync();
+            _logService = new LogService(_storageService);
+
+            _logService.Info("MainForm", "Backend services initialized");
+
+            // 2. 启动 Kestrel HTTP 服务器
+            await StartHttpServerAsync(_httpPort);
+
+            // 3. 创建 WebView2 控件
+            webView = new WebView2
+            {
+                Dock = DockStyle.Fill
+            };
+            Controls.Add(webView);
+
+            // 4. 初始化 WebView2 运行时
             await webView.EnsureCoreWebView2Async(null);
 
-            // 注册 WebView2 消息处理（前端可通过 postMessage 与 C# 通讯）
+            // 注册消息处理（前端通过 postMessage 与 C# 通讯）
             webView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
 
-            // 导航到前端页面
+            // 5. 导航到前端页面
             var url = $"http://localhost:{_httpPort}";
             webView.CoreWebView2.Navigate(url);
 
-            // 开发者工具（开发模式下可用）
+            // 开发者工具
             webView.CoreWebView2.Settings.AreDevToolsEnabled = true;
             webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
+
+            _logService.Info("MainForm", $"WebView2 navigated to {url}");
         }
         catch (Exception ex)
         {
-            MessageBox.Show(
-                $"无法初始化 WebView2。请确保已安装 Microsoft Edge WebView2 Runtime。\n\n错误：{ex.Message}",
-                "OneDeck 启动失败",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Error
-            );
-            Application.Exit();
+            // 如果 WebView2 初始化失败，显示错误信息
+            var errorLabel = new Label
+            {
+                Text = $"无法初始化 WebView2 运行时。\n\n" +
+                       $"请确保已安装 Microsoft Edge WebView2 Runtime。\n" +
+                       $"下载地址：https://developer.microsoft.com/microsoft-edge/webview2/\n\n" +
+                       $"错误详情：{ex.Message}",
+                ForeColor = Color.White,
+                BackColor = Color.FromArgb(3, 7, 18),
+                Font = new Font("Segoe UI", 12),
+                AutoSize = false,
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Padding = new Padding(40)
+            };
+            Controls.Add(errorLabel);
+            errorLabel.BringToFront();
         }
+    }
+
+    /// <summary>
+    /// 启动 Kestrel HTTP 服务器，提供前端 Vue 应用的静态文件
+    /// </summary>
+    private async Task StartHttpServerAsync(int port)
+    {
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+
+        var app = builder.Build();
+
+        // 确定前端文件路径
+        var wwwrootPath = System.IO.Path.Combine(AppContext.BaseDirectory, "wwwroot");
+        if (!System.IO.Directory.Exists(wwwrootPath) || !System.IO.Directory.EnumerateFiles(wwwrootPath, "*.html").Any())
+        {
+            // 尝试开发目录
+            var devPath = System.IO.Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "frontend", "dist");
+            if (System.IO.Directory.Exists(devPath))
+            {
+                wwwrootPath = System.IO.Path.GetFullPath(devPath);
+            }
+            else
+            {
+                System.IO.Directory.CreateDirectory(wwwrootPath);
+            }
+        }
+
+        // 提供静态文件
+        app.UseDefaultFiles(new DefaultFilesOptions
+        {
+            FileProvider = new PhysicalFileProvider(wwwrootPath)
+        });
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            FileProvider = new PhysicalFileProvider(wwwrootPath)
+        });
+
+        // SPA 路由回退
+        app.MapFallback(async (HttpContext ctx) =>
+        {
+            var indexPath = System.IO.Path.Combine(wwwrootPath, "index.html");
+            if (System.IO.File.Exists(indexPath))
+            {
+                ctx.Response.ContentType = "text/html";
+                await ctx.Response.SendFileAsync(indexPath);
+            }
+            else
+            {
+                ctx.Response.StatusCode = 404;
+                await ctx.Response.WriteAsync("Frontend not built. Run: cd desktop/frontend && npm run build");
+            }
+        });
+
+        await app.StartAsync();
+        _logService?.Info("MainForm", $"HTTP server started on http://localhost:{port} (root: {wwwrootPath})");
     }
 
     /// <summary>
@@ -97,35 +186,32 @@ public class MainForm : Form
         }
     }
 
+    protected override void OnFormClosed(FormClosedEventArgs e)
+    {
+        // 清理后端服务
+        _storageService?.CloseAsync().Wait();
+        base.OnFormClosed(e);
+    }
+
     /// <summary>
-    /// 允许无边框窗口拖拽（点击非 WebView 区域时）
+    /// 允许无边框窗口通过鼠标拖拽移动
     /// </summary>
     protected override void WndProc(ref Message m)
     {
-        // 处理 WM_NCHITTEST 实现窗口拖拽
         const int WM_NCHITTEST = 0x84;
-        const int HTCLIENT = 1;
         const int HTCAPTION = 2;
 
         base.WndProc(ref m);
 
-        if (m.Msg == WM_NCHITTEST)
+        if (m.Msg == WM_NCHITTEST && (int)m.Result == 1)
         {
-            // 如果鼠标在客户区，允许通过标题栏拖拽
-            // 实际拖拽由前端标题栏触发 postMessage 处理
+            // 将客户区点击转换为标题栏拖拽
+            // 仅在顶部 40px（标题栏高度）区域生效
+            var pos = PointToClient(new Point(m.LParam.ToInt32()));
+            if (pos.Y < 40)
+            {
+                m.Result = (IntPtr)HTCAPTION;
+            }
         }
-    }
-
-    protected override void OnResize(EventArgs e)
-    {
-        base.OnResize(e);
-        // 通知前端窗口大小变化
-        try
-        {
-            webView?.CoreWebView2?.PostWebMessageAsJson(
-                $"{{\"type\":\"resize\",\"width\":{ClientSize.Width},\"height\":{ClientSize.Height},\"state\":\"{WindowState}\"}}"
-            );
-        }
-        catch { }
     }
 }

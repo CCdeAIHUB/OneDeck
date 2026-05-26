@@ -1,12 +1,13 @@
 using System;
-using System.Threading.Tasks;
+using System.Windows.Forms;
 using OneDeck.Desktop.Models;
 
 namespace OneDeck.Desktop;
 
 class Program
 {
-    static async Task Main(string[] args)
+    [STAThread]
+    static void Main(string[] args)
     {
         var portWs = 9720;
         var portHttp = 9721;
@@ -20,7 +21,13 @@ class Program
                 int.TryParse(args[++i], out portHttp);
         }
 
-        var app = new AppHost();
-        await app.StartAsync(portWs, portHttp);
+        // 初始化 WinForms
+        ApplicationConfiguration.Initialize();
+
+        // 创建主窗体（内部启动 HTTP 服务器和 WebView2）
+        var mainForm = new MainForm(portHttp, portWs);
+
+        // 运行消息循环（阻塞直到窗口关闭）
+        Application.Run(mainForm);
     }
 }

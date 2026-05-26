@@ -1,55 +1,48 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import { useRoute, useRouter } from 'vue-router'
-import { computed } from 'vue'
+import { useRoute } from 'vue-router'
+import { computed, ref } from 'vue'
 
 const route = useRoute()
-const router = useRouter()
 
 interface NavItem {
   name: string
   icon: string
-  iconHover: string
+  iconActive: string
   path: string
 }
 
 const navItems: NavItem[] = [
-  { name: '仪表盘', icon: 'solar:home-bold', iconHover: 'solar:home-bold-duotone', path: '/dashboard' },
-  { name: '设备', icon: 'solar:smartphone-bold', iconHover: 'solar:smartphone-bold-duotone', path: '/devices' },
-  { name: '方案', icon: 'solar:widget-bold', iconHover: 'solar:widget-bold-duotone', path: '/schemes' },
-  { name: '插件', icon: 'solar:widget-2-bold', iconHover: 'solar:widget-2-bold-duotone', path: '/plugins' },
-  { name: '日志', icon: 'solar:document-text-bold', iconHover: 'solar:document-text-bold-duotone', path: '/logs' },
-  { name: '设置', icon: 'solar:settings-bold', iconHover: 'solar:settings-bold-duotone', path: '/settings' },
+  { name: '仪表盘', icon: 'solar:home-linear', iconActive: 'solar:home-bold', path: '/dashboard' },
+  { name: '设备', icon: 'solar:smartphone-linear', iconActive: 'solar:smartphone-bold', path: '/devices' },
+  { name: '页面', icon: 'solar:document-linear', iconActive: 'solar:document-bold', path: '/pages' },
+  { name: '组件', icon: 'solar:widget-2-linear', iconActive: 'solar:widget-2-bold', path: '/components' },
+  { name: '方案', icon: 'solar:widget-linear', iconActive: 'solar:widget-bold', path: '/schemes' },
+  { name: '插件', icon: 'solar:plugin-linear', iconActive: 'solar:plugin-bold', path: '/plugins' },
+  { name: '日志', icon: 'solar:document-text-linear', iconActive: 'solar:document-text-bold', path: '/logs' },
+  { name: '设置', icon: 'solar:settings-linear', iconActive: 'solar:settings-bold', path: '/settings' },
 ]
 
-const isActive = (path: string) => route.path.startsWith(path)
+const isActive = (path: string) => {
+  if (path === '/dashboard' && route.path === '/') return true
+  return route.path.startsWith(path)
+}
 </script>
 
 <template>
-  <nav class="w-16 bg-gray-900 border-r border-gray-800 flex flex-col items-center py-4 gap-2 shrink-0">
+  <nav class="w-16 bg-gray-900 border-r border-gray-800 flex flex-col items-center py-4 gap-1 shrink-0">
     <router-link
       v-for="item in navItems"
       :key="item.path"
       :to="item.path"
       class="group relative w-10 h-10 flex items-center justify-center rounded-lg transition-all duration-200"
-      :class="isActive(item.path) ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'"
+      :class="isActive(item.path) ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-indigo-300'"
       :title="item.name"
     >
-      <!-- 选中：bold / Hover：bold-duotone -->
+      <!-- 默认：linear | 选中：bold | Hover：bold-duotone -->
       <Icon
-        :icon="isActive(item.path) ? item.icon : item.iconHover"
-        class="text-xl opacity-0 absolute transition-opacity"
-        :class="{ 'opacity-100': isActive(item.path) }"
-      />
-      <Icon
-        :icon="item.iconHover"
-        class="text-xl opacity-0 absolute transition-opacity group-hover:opacity-100"
-        :class="{ '!opacity-0': isActive(item.path) }"
-      />
-      <Icon
-        :icon="item.icon"
-        class="text-xl transition-opacity"
-        :class="{ 'opacity-0': isActive(item.path) || $el?.matches(':hover') }"
+        :icon="isActive(item.path) ? item.iconActive : item.icon"
+        class="text-xl"
       />
 
       <!-- Tooltip -->

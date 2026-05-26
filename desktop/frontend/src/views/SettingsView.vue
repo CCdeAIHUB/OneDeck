@@ -64,40 +64,40 @@ function saveSettings() {
       <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
         <h3 class="font-semibold mb-4">通用</h3>
         <div class="space-y-4">
-          <div class="flex items-center justify-between">
-            <div>
+          <div class="flex items-center justify-between gap-4">
+            <div class="min-w-0">
               <p class="text-sm">开机自启动</p>
               <p class="text-xs text-gray-500">系统启动时自动运行 OneDeck</p>
             </div>
             <button
-              class="relative w-10 h-5 rounded-full transition-colors duration-200"
+              class="relative w-11 h-6 rounded-full shrink-0 transition-colors duration-200"
               :class="autoStart ? 'bg-indigo-600' : 'bg-gray-700'"
               @click="autoStart = !autoStart"
             >
               <span
-                class="absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform duration-200"
-                :class="autoStart ? 'translate-x-5' : 'translate-x-0.5'"
+                class="absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform duration-200"
+                :class="autoStart ? 'translate-x-5' : 'translate-x-0'"
               />
             </button>
           </div>
-          <div class="flex items-center justify-between">
-            <div>
+          <div class="flex items-center justify-between gap-4">
+            <div class="min-w-0">
               <p class="text-sm">最小化到托盘</p>
               <p class="text-xs text-gray-500">关闭窗口时最小化到系统托盘</p>
             </div>
             <button
-              class="relative w-10 h-5 rounded-full transition-colors duration-200"
+              class="relative w-11 h-6 rounded-full shrink-0 transition-colors duration-200"
               :class="minimizeToTray ? 'bg-indigo-600' : 'bg-gray-700'"
               @click="minimizeToTray = !minimizeToTray"
             >
               <span
-                class="absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform duration-200"
-                :class="minimizeToTray ? 'translate-x-5' : 'translate-x-0.5'"
+                class="absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform duration-200"
+                :class="minimizeToTray ? 'translate-x-5' : 'translate-x-0'"
               />
             </button>
           </div>
-          <div class="flex items-center justify-between">
-            <div>
+          <div class="flex items-center justify-between gap-4">
+            <div class="min-w-0">
               <p class="text-sm">主题</p>
               <p class="text-xs text-gray-500">界面主题</p>
             </div>
@@ -116,8 +116,8 @@ function saveSettings() {
       <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
         <h3 class="font-semibold mb-4">日志</h3>
         <div class="space-y-4">
-          <div class="flex items-center justify-between">
-            <div>
+          <div class="flex items-center justify-between gap-4">
+            <div class="min-w-0">
               <p class="text-sm">最低日志级别</p>
               <p class="text-xs text-gray-500">低于此级别的日志不会记录</p>
             </div>
@@ -131,8 +131,8 @@ function saveSettings() {
               <option value="error">ERROR</option>
             </select>
           </div>
-          <div class="flex items-center justify-between">
-            <div>
+          <div class="flex items-center justify-between gap-4">
+            <div class="min-w-0">
               <p class="text-sm">最大日志条数</p>
               <p class="text-xs text-gray-500">超出后自动清理最旧的日志</p>
             </div>
