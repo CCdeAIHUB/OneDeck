@@ -149,9 +149,25 @@ export const useDesignStore = defineStore('design', () => {
     components.value.find((c) => c.id === currentComponentId.value)
   )
 
+  // ==================== 防重名 ====================
+
+  function generateUniqueName(baseName: string, existingNames: string[]): string {
+    if (!existingNames.includes(baseName)) return baseName
+    let i = 1
+    while (existingNames.includes(`${baseName} ${i}`)) i++
+    return `${baseName} ${i}`
+  }
+
+  function checkDuplicateName(name: string, type: 'page' | 'component', excludeId?: string): boolean {
+    const list = type === 'page' ? pages.value : components.value
+    return list.some(item => item.name === name && item.id !== excludeId)
+  }
+
   // ==================== 页面操作 ====================
 
   function createPage(partial?: Partial<PageDesign>): PageDesign {
+    const existingNames = pages.value.map(p => p.name)
+    const name = generateUniqueName(partial?.name ?? '新页面', existingNames)
     const page: PageDesign = {
       id: crypto.randomUUID().slice(0, 8),
       name: partial?.name ?? '新页面',
@@ -226,6 +242,8 @@ export const useDesignStore = defineStore('design', () => {
   // ==================== 组件操作 ====================
 
   function createComponent(partial?: Partial<ComponentDesign>): ComponentDesign {
+    const existingNames = components.value.map(c => c.name)
+    const name = generateUniqueName(partial?.name ?? '新组件', existingNames)
     const comp: ComponentDesign = {
       id: crypto.randomUUID().slice(0, 8),
       name: partial?.name ?? '新组件',
@@ -264,5 +282,6 @@ export const useDesignStore = defineStore('design', () => {
     createPage, updatePage, deletePage, selectPage,
     regenerateCells, updateCell,
     createComponent, updateComponent, deleteComponent, selectComponent,
+    generateUniqueName, checkDuplicateName,
   }
 })

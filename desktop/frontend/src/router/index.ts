@@ -62,7 +62,13 @@ const router = createRouter({
       path: '/plugins',
       name: 'plugins',
       component: () => import('@/views/PluginsView.vue'),
-      meta: { title: '插件', icon: 'solar:puzzle-bold' },
+      meta: { title: '插件', icon: 'solar:code-square-bold' },
+    },
+    {
+      path: '/plugins/:id/editor',
+      name: 'plugin-editor',
+      component: () => import('@/views/PluginEditorView.vue'),
+      meta: { title: '插件编辑器' },
     },
     {
       path: '/shared-params',

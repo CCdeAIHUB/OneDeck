@@ -2,10 +2,8 @@
 import { Icon } from '@iconify/vue'
 import { useRoute } from 'vue-router'
 import { computed } from 'vue'
-import { useThemeStore } from '@/stores/theme'
 
 const route = useRoute()
-const themeStore = useThemeStore()
 
 interface NavItem {
   name: string
@@ -20,7 +18,7 @@ const navItems: NavItem[] = [
   { name: '页面', icon: 'solar:clipboard-list-linear', iconActive: 'solar:clipboard-list-bold', path: '/pages' },
   { name: '组件', icon: 'solar:widget-2-linear', iconActive: 'solar:widget-2-bold', path: '/components' },
   { name: '方案', icon: 'solar:layers-linear', iconActive: 'solar:layers-bold', path: '/schemes' },
-  { name: '插件', icon: 'solar:puzzle-linear', iconActive: 'solar:puzzle-bold', path: '/plugins' },
+  { name: '插件', icon: 'solar:code-square-linear', iconActive: 'solar:code-square-bold', path: '/plugins' },
   { name: '参数库', icon: 'solar:database-linear', iconActive: 'solar:database-bold', path: '/shared-params' },
   { name: '设置', icon: 'solar:settings-linear', iconActive: 'solar:settings-bold', path: '/settings' },
 ]
@@ -51,7 +49,6 @@ const isActive = (path: string) => {
         :icon="isActive(item.path) ? item.iconActive : item.icon"
         class="text-lg"
       />
-      <!-- Tooltip -->
       <span
         class="absolute left-full ml-2 px-2 py-1 text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50"
         style="background-color: var(--color-bg-surface); color: var(--color-text);"
@@ -59,17 +56,5 @@ const isActive = (path: string) => {
         {{ item.name }}
       </span>
     </router-link>
-
-    <!-- 底部主题切换 -->
-    <div class="mt-auto pt-3">
-      <button
-        class="w-10 h-10 flex items-center justify-center rounded-lg transition-all duration-200 opacity-60 hover:opacity-90"
-        style="color: var(--color-text-muted);"
-        @click="themeStore.setMode(themeStore.getEffectiveTheme() === 'dark' ? 'light' : 'dark')"
-        :title="themeStore.getEffectiveTheme() === 'dark' ? '切换浅色模式' : '切换深色模式'"
-      >
-        <Icon :icon="themeStore.getEffectiveTheme() === 'dark' ? 'solar:sun-bold' : 'solar:moon-bold'" class="text-lg" />
-      </button>
-    </div>
   </nav>
 </template>

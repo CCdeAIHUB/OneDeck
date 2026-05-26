@@ -59,7 +59,7 @@ function exportPage(page: any) {
       </button>
     </div>
 
-    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
       <div
         v-for="page in designStore.pages"
         :key="page.id"
@@ -69,7 +69,7 @@ function exportPage(page: any) {
       >
         <div class="flex items-start justify-between mb-3">
           <h3 class="font-semibold">{{ page.name }}</h3>
-          <span class="text-xs" style="color: var(--color-text-dim);">{{ page.orientation === 'vertical' ? '竖屏' : '横屏' }}</span>
+          <span class="text-xs px-1.5 py-0.5 rounded" :style="page.orientation === 'vertical' ? 'background-color: rgba(59,130,246,0.15); color: var(--color-primary);' : 'background-color: rgba(245,158,11,0.15); color: #f59e0b;'">{{ page.orientation === 'vertical' ? '竖屏' : '横屏' }}</span>
         </div>
 
         <div class="text-xs space-y-1 mb-4" style="color: var(--color-text-muted);">
@@ -80,7 +80,7 @@ function exportPage(page: any) {
           <p v-else>背景：视频</p>
         </div>
 
-        <!-- 格子预览 -->
+        <!-- 格子预览 - 竖屏高窄，横屏矮宽 -->
         <div
           class="rounded-lg overflow-hidden mb-3"
           :style="{

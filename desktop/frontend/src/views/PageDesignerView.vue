@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import { useDesignStore, type PageCell } from '@/stores/design'
+import { useDeviceStore } from '@/stores/devices'
 import { useRoute, useRouter } from 'vue-router'
 import { computed, ref, watch } from 'vue'
 
 const route = useRoute()
 const router = useRouter()
 const designStore = useDesignStore()
+const deviceStore = useDeviceStore()
 
 const pageId = computed(() => route.params.id as string)
 const page = computed(() => designStore.pages.find((p) => p.id === pageId.value))
@@ -78,6 +80,36 @@ function updateCellProp(key: keyof PageCell, value: unknown) {
 function goBack() { router.push('/pages') }
 
 const availableComponents = computed(() => designStore.components)
+
+// 设备比例预览
+const devicePreviewStyle = computed(() => {
+  const device = deviceStore.selectedDevice
+  if (device && device.screenWidth && device.screenHeight) {
+    const ratio = device.screenWidth / device.screenHeight
+    const maxW = 480
+    const maxH = 700
+    let w, h
+    if (ratio > 1) {
+      w = maxW
+      h = maxW / ratio
+    } else {
+      h = maxH
+      w = maxH * ratio
+    }
+    return { width: `${Math.round(w)}px`, height: `${Math.round(h)}px` }
+  }
+  // 默认根据方向
+  if (pageOrientation.value === 'vertical') {
+    return { width: '360px', height: '640px' }
+  }
+  return { width: '640px', height: '360px' }
+})
+
+const deviceLabel = computed(() => {
+  const device = deviceStore.selectedDevice
+  if (device) return `${device.deviceName} (${device.screenWidth}x${device.screenHeight})`
+  return pageOrientation.value === 'vertical' ? '默认竖屏 9:16' : '默认横屏 16:9'
+})
 </script>
 
 <template>
@@ -207,12 +239,11 @@ const availableComponents = computed(() => designStore.components)
     </div>
 
     <!-- 中间：画布预览 -->
-    <div class="flex-1 flex items-center justify-center rounded-xl border overflow-hidden" style="background-color: var(--color-bg); border-color: var(--color-border);">
+    <div class="flex-1 flex flex-col items-center justify-center rounded-xl border overflow-hidden" style="background-color: var(--color-bg); border-color: var(--color-border);">
       <div
         class="relative shadow-2xl"
         :style="{
-          width: pageOrientation === 'vertical' ? '360px' : '640px',
-          height: pageOrientation === 'vertical' ? '640px' : '360px',
+          ...devicePreviewStyle,
           backgroundColor: bgType === 'color' ? bgColor : 'var(--color-bg-surface)'
         }"
       >
@@ -251,6 +282,8 @@ const availableComponents = computed(() => designStore.components)
           </div>
         </div>
       </div>
+      <!-- 设备比例标签 -->
+      <div class="mt-3 text-xs" style="color: var(--color-text-dim);">{{ deviceLabel }}</div>
     </div>
   </div>
 
