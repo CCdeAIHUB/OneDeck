@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+/* OneDeck 自定义样式 */
+:root {
+  --color-primary: #6366f1;
+  --color-primary-hover: #818cf8;
+  --color-bg-dark: #030712;
+  --color-bg-card: #111827;
+  --color-bg-surface: #1f2937;
+  --color-border: #374151;
+  --color-text: #f9fafb;
+  --color-text-muted: #9ca3af;
+  --titlebar-height: 40px;
+}
+
+html, body, #app {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background-color: var(--color-bg-dark);
+  color: var(--color-text);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* 无标题栏窗口拖拽区域 */
+.titlebar-drag {
+  -webkit-app-region: drag;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.titlebar-no-drag {
+  -webkit-app-region: no-drag;
+}

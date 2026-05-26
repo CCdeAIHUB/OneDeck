@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+:root {
+  --color-primary: #6366f1;
+  --color-bg-dark: #030712;
+  --color-bg-card: #111827;
+  --color-bg-surface: #1f2937;
+  --color-border: #374151;
+  --color-text: #f9fafb;
+  --color-text-muted: #9ca3af;
+  --statusbar-height: 0px; /* 原生层设置安全区域 */
+  --safe-area-bottom: 0px;
+}
+
+html, body, #app {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background-color: var(--color-bg-dark);
+  color: var(--color-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* 防止长按选中 */
+* {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input, textarea {
+  -webkit-user-select: auto;
+  user-select: auto;
+}
+
+::-webkit-scrollbar {
+  display: none;
+}

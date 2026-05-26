@@ -1,0 +1,60 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build output
+dist/
+bin/
+obj/
+*.dll
+*.pdb
+*.exe
+
+# .NET
+.vs/
+*.user
+*.suo
+*.cache
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+.vscode/settings.json
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Android
+*.apk
+*.aab
+.gradle/
+local.properties
+build/
+.cxx/
+
+# iOS
+*.ipa
+xcuserdata/
+DerivedData/
+Pods/
+
+# HarmonyOS
+.hvigor/
+oh_modules/
+
+# Temporary
+*.tmp
+*.temp

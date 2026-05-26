@@ -1,0 +1,14 @@
+{
+  "name": "@onedeck/shared-protocol",
+  "version": "0.1.0",
+  "description": "OneDeck shared WebSocket protocol definitions",
+  "main": "src/messages.ts",
+  "types": "src/messages.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}
