@@ -1,13 +1,17 @@
 using System;
 using System.Threading.Tasks;
-using OneDeck.Desktop.Models;
+using System.Windows.Forms;
 using OneDeck.Desktop.Services;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.AspNetCore.Http;
 
 namespace OneDeck.Desktop;
 
 /// <summary>
 /// 桌面端应用主入口
-/// 职责：初始化所有服务、启动 WebSocket 服务器、加载前端
+/// 职责：初始化所有服务、启动 WebSocket 服务器、启动 HTTP 服务器、打开 WebView2 窗口
 /// </summary>
 public class AppHost
 {
@@ -44,20 +48,16 @@ public class AppHost
         // 启动 WebSocket 服务器
         _webSocketService.Start(wsPort);
 
-        // 启动 HTTP 服务器（提供前端静态文件）
-        StartHttpServer(httpPort);
+        // 启动 Kestrel HTTP 服务器（提供前端静态文件）
+        var httpServerTask = StartHttpServerAsync(httpPort);
 
         _logService.Info("AppHost", $"OneDeck Desktop started. WS: ws://0.0.0.0:{wsPort}, HTTP: http://localhost:{httpPort}");
 
-        // 等待关闭信号
-        var tcs = new TaskCompletionSource();
-        Console.CancelKeyPress += (_, e) =>
-        {
-            e.Cancel = true;
-            tcs.TrySetResult();
-        };
-        await tcs.Task;
+        // 启动 WebView2 窗口（在 UI 线程）
+        ApplicationConfiguration.Initialize();
+        Application.Run(new MainForm(httpPort));
 
+        // 窗口关闭后清理
         await StopAsync();
     }
 
@@ -68,10 +68,55 @@ public class AppHost
         _logService.Info("AppHost", "OneDeck Desktop stopped.");
     }
 
-    private void StartHttpServer(int port)
+    /// <summary>
+    /// 启动 Kestrel HTTP 服务器，提供前端 Vue 应用的静态文件
+    /// </summary>
+    private async Task StartHttpServerAsync(int port)
     {
-        // TODO: 使用 ASP.NET Core Kestrel 或自定义 HTTP 服务器
-        // 提供桌面端前端 Vue 应用的静态文件
-        _logService.Info("AppHost", $"HTTP server started on port {port}");
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+
+        var app = builder.Build();
+
+        // 确定前端文件路径
+        var wwwrootPath = System.IO.Path.Combine(AppContext.BaseDirectory, "wwwroot");
+        if (!System.IO.Directory.Exists(wwwrootPath))
+        {
+            wwwrootPath = System.IO.Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "frontend", "dist");
+            if (!System.IO.Directory.Exists(wwwrootPath))
+            {
+                wwwrootPath = System.IO.Path.Combine(AppContext.BaseDirectory, "wwwroot");
+                System.IO.Directory.CreateDirectory(wwwrootPath);
+            }
+        }
+
+        // 提供静态文件
+        app.UseDefaultFiles();
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            FileProvider = new PhysicalFileProvider(wwwrootPath),
+            RequestPath = ""
+        });
+
+        // SPA 路由回退
+        app.MapFallback(async (HttpContext ctx) =>
+        {
+            var indexPath = System.IO.Path.Combine(wwwrootPath, "index.html");
+            if (System.IO.File.Exists(indexPath))
+            {
+                ctx.Response.ContentType = "text/html";
+                await ctx.Response.SendFileAsync(indexPath);
+            }
+            else
+            {
+                ctx.Response.StatusCode = 404;
+                await ctx.Response.WriteAsync("Frontend not built. Run: cd desktop/frontend && npm run build");
+            }
+        });
+
+        // 启动 HTTP 服务器（非阻塞）
+        await app.StartAsync();
+
+        _logService.Info("AppHost", $"HTTP server serving from: {wwwrootPath}");
     }
 }
