@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using OneDeck.Desktop.Models;
 
 namespace OneDeck.Desktop.Services;
@@ -266,9 +270,9 @@ public class WebSocketService
             Payload = new Dictionary<string, object>
             {
                 ["callId"] = callId,
-                ["success"] = result.Success,
+                ["success"] = result.IsSuccess,
                 ["result"] = result.Data ?? new(),
-                ["error"] = result.Error ?? ""
+                ["error"] = result.ErrorMessage ?? ""
             }
         });
     }
