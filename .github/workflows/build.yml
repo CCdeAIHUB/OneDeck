@@ -1,0 +1,133 @@
+name: Build OneDeck
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  NODE_VERSION: '22.x'
+
+jobs:
+  # ==================== Windows 桌面端构建 ====================
+  build-windows:
+    runs-on: windows-latest
+    name: Build Windows Desktop
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: desktop/frontend/package-lock.json
+
+      # 桌面端前端构建
+      - name: Install desktop frontend dependencies
+        working-directory: desktop/frontend
+        run: npm ci
+
+      - name: Build desktop frontend
+        working-directory: desktop/frontend
+        run: npx vite build
+
+      # 将前端产物复制到 C# 项目的 wwwroot
+      - name: Copy frontend to wwwroot
+        shell: pwsh
+        run: |
+          $wwwroot = "desktop/backend/OneDesk.Desktop/wwwroot"
+          if (!(Test-Path $wwwroot)) { New-Item -ItemType Directory -Path $wwwroot -Force }
+          Copy-Item -Path "desktop/frontend/dist/*" -Destination $wwwroot -Recurse -Force
+
+      # C# 后端构建
+      - name: Restore .NET dependencies
+        working-directory: desktop/backend/OneDesk.Desktop
+        run: dotnet restore
+
+      - name: Build .NET (Windows x64)
+        working-directory: desktop/backend/OneDesk.Desktop
+        run: dotnet publish -c Release -r win-x64 --self-contained true -o ./publish/win-x64
+
+      - name: Build .NET (Windows arm64)
+        working-directory: desktop/backend/OneDesk.Desktop
+        run: dotnet publish -c Release -r win-arm64 --self-contained true -o ./publish/win-arm64
+
+      # 上传产物
+      - name: Upload Windows x64 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OneDeck-Windows-x64
+          path: desktop/backend/OneDesk.Desktop/publish/win-x64/
+          retention-days: 30
+
+      - name: Upload Windows arm64 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OneDeck-Windows-arm64
+          path: desktop/backend/OneDesk.Desktop/publish/win-arm64/
+          retention-days: 30
+
+  # ==================== Android 移动端构建 ====================
+  build-android:
+    runs-on: ubuntu-latest
+    name: Build Android
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: mobile/frontend/package-lock.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      # 移动端前端构建
+      - name: Install mobile frontend dependencies
+        working-directory: mobile/frontend
+        run: npm ci
+
+      - name: Build mobile frontend
+        working-directory: mobile/frontend
+        run: npx vite build
+
+      # 将前端产物复制到 Android assets 目录
+      - name: Copy frontend to Android assets
+        run: |
+          mkdir -p mobile/android/app/src/main/assets/frontend
+          cp -r mobile/frontend/dist/* mobile/android/app/src/main/assets/frontend/
+
+      # Android 构建（需要完整的 build.gradle 等配置文件）
+      # 目前是骨架项目，Gradle 构建会失败，暂时只做前端构建验证
+      - name: Verify Android project structure
+        run: |
+          echo "Android build skipped - skeleton project without Gradle configuration"
+          echo "Frontend build artifacts are ready at mobile/frontend/dist/"
+          ls -la mobile/frontend/dist/ || true
+
+      - name: Upload mobile frontend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OneDeck-Mobile-Frontend
+          path: mobile/frontend/dist/
+          retention-days: 30
