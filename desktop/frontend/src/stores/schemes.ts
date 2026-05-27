@@ -33,6 +33,8 @@ export interface Scheme {
   id: string
   name: string
   targetDeviceId: string
+  /** 主页面ID（移动设备默认启动页面） */
+  homePageId: string
   layout: SchemeLayout
   plugins: SchemePluginInstance[]
   version: number

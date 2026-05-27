@@ -33,10 +33,10 @@ export interface PageBackground {
 
 export interface CellTrigger {
   /** 触发类型 */
-  type: 'none' | 'setParam' | 'navigatePage' | 'callApi'
-  /** setParam: 参数键名; navigatePage: 页面ID; callApi: API端点 */
+  type: 'none' | 'setParam' | 'navigatePage' | 'callApi' | 'openFile' | 'openUrl' | 'closeProcess' | 'systemCommand'
+  /** setParam: 参数键名; navigatePage: 页面ID; callApi: API端点; openFile: 文件路径; openUrl: URL; closeProcess: 进程名; systemCommand: 命令 */
   target: string
-  /** setParam: 新值; callApi: 参数 */
+  /** setParam: 新值; callApi: 参数; closeProcess: 进程名; systemCommand: 参数 */
   value: string
 }
 
@@ -120,6 +120,30 @@ export function defaultCellStyle(): CellStyle {
     backgroundImage: '',
     backgroundVideo: '',
   }
+}
+
+// ==================== &param 动态绑定 ====================
+
+/** 解析 &paramName 语法，替换为公共参数值 */
+export function resolveParamRefs(text: string, getParam: (key: string) => string | undefined): string {
+  if (!text) return ''
+  return text.replace(/&(\w+)/g, (_, key) => {
+    const val = getParam(key)
+    return val !== undefined ? val : `&${key}`
+  })
+}
+
+/** 检查文本是否包含 &param 引用 */
+export function hasParamRefs(text: string): boolean {
+  if (!text) return false
+  return /&\w+/.test(text)
+}
+
+/** 从文本中提取所有 &param 引用的参数名 */
+export function extractParamRefs(text: string): string[] {
+  if (!text) return []
+  const matches = text.matchAll(/&(\w+)/g)
+  return [...new Set(Array.from(matches, m => m[1]))]
 }
 
 // ==================== 手势触发模型 ====================
@@ -221,11 +245,12 @@ export const useDesignStore = defineStore('design', () => {
   // ==================== 页面操作 ====================
 
   function createPage(partial?: Partial<PageDesign>): PageDesign {
+    const baseName = partial?.name ?? '新页面'
     const existingNames = pages.value.map(p => p.name)
-    const name = generateUniqueName(partial?.name ?? '新页面', existingNames)
+    const name = generateUniqueName(baseName, existingNames)
     const page: PageDesign = {
       id: crypto.randomUUID().slice(0, 8),
-      name: partial?.name ?? '新页面',
+      name,
       orientation: partial?.orientation ?? 'vertical',
       rows: partial?.rows ?? 4,
       columns: partial?.columns ?? 3,

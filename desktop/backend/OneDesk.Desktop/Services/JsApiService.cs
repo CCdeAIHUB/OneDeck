@@ -390,6 +390,53 @@ public class JsApiService
             }
         });
 
+        // pc.fontList - 获取系统字体列表
+        RegisterApi("pc.fontList", async (args, deviceId, pluginId) =>
+        {
+            await Task.CompletedTask;
+            try
+            {
+                var fonts = new List<string>();
+                using var collection = new System.Drawing.Text.InstalledFontCollection();
+                foreach (var family in collection.Families)
+                {
+                    fonts.Add(family.Name);
+                }
+                return JsApiResult.Ok(new { fonts, count = fonts.Count });
+            }
+            catch (Exception ex)
+            {
+                return JsApiResult.Fail($"Font list failed: {ex.Message}");
+            }
+        });
+
+        // pc.processKill - 关闭进程
+        RegisterApi("pc.processKill", async (args, deviceId, pluginId) =>
+        {
+            var processName = args.GetValueOrDefault("name", "")?.ToString() ?? "";
+            var pid = args.GetValueOrDefault("pid", 0);
+            try
+            {
+                if (pid is int p && p > 0)
+                {
+                    var proc = Process.GetProcessById(p);
+                    proc.Kill();
+                    return JsApiResult.Ok(new { killed = true, pid = p });
+                }
+                if (!string.IsNullOrEmpty(processName))
+                {
+                    var procs = Process.GetProcessesByName(processName);
+                    foreach (var proc in procs) proc.Kill();
+                    return JsApiResult.Ok(new { killed = true, name = processName, count = procs.Length });
+                }
+                return JsApiResult.Fail("Process name or pid is required");
+            }
+            catch (Exception ex)
+            {
+                return JsApiResult.Fail($"Process kill failed: {ex.Message}");
+            }
+        });
+
         // pc.registry.read - 读取注册表（仅 Windows）
         RegisterApi("pc.registry.read", async (args, deviceId, pluginId) =>
         {

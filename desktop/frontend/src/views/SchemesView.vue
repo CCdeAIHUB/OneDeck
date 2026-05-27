@@ -28,6 +28,7 @@ function confirmCreate() {
     id: crypto.randomUUID().slice(0, 8),
     name,
     targetDeviceId: '',
+    homePageId: '',
     layout: {
       type: 'grid' as const,
       columns: 3,

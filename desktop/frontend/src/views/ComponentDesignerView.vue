@@ -412,7 +412,7 @@ const devGuide = [
             <input v-model.number="db.interval" type="number" class="flex-1 px-2 py-0.5 rounded text-xs focus:outline-none" style="background-color: var(--color-bg); border: 1px solid var(--color-border); color: var(--color-text);" />
           </div>
         </div>
-        <button v-if="dataBindings.length > 0" @click="scriptCode = generateDataImportCode()" class="w-full px-2 py-1.5 rounded text-xs text-white" style="background-color: var(--color-primary);">生成数据引入代码</button>
+        <button v-if="dataBindings.length > 0" @click="scriptCode = scriptCode + '\n\n' + generateDataImportCode()" class="w-full px-2 py-1.5 rounded text-xs text-white" style="background-color: var(--color-primary);">追加数据引入代码</button>
       </div>
 
       <!-- 静态资源 -->

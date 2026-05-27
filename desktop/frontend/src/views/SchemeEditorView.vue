@@ -15,6 +15,7 @@ const scheme = computed(() => schemeStore.schemes.find(s => s.id === schemeId.va
 
 // 方案数据
 const schemeName = ref('新方案')
+const schemeHomePageId = ref('')
 const schemePages = ref<Array<{ pageId: string; order: number }>>([])
 const gestures = ref<SchemeGestureConfig[]>([])
 const currentPageIndex = ref(0)
@@ -253,7 +254,9 @@ const flowData = computed(() => {
   return { nodes, edges }
 })
 
-// 拖拽节点
+// 拖拽节点 - 使用持久化位置覆盖
+const nodeOverrides = reactive<Record<string, { x: number; y: number }>>({})
+
 const dragState = reactive({
   dragging: false,
   nodeId: '',
@@ -264,24 +267,23 @@ const dragState = reactive({
 })
 
 function startDrag(nodeId: string, event: MouseEvent) {
-  const node = flowData.value.nodes.find(n => n.id === nodeId)
-  if (!node) return
+  const pos = getNodePosition(nodeId)
   dragState.dragging = true
   dragState.nodeId = nodeId
   dragState.startX = event.clientX
   dragState.startY = event.clientY
-  dragState.nodeStartX = node.x
-  dragState.nodeStartY = node.y
+  dragState.nodeStartX = pos.x
+  dragState.nodeStartY = pos.y
 }
 
 function onDrag(event: MouseEvent) {
   if (!dragState.dragging) return
-  const node = flowData.value.nodes.find(n => n.id === dragState.nodeId)
-  if (!node) return
   const dx = event.clientX - dragState.startX
   const dy = event.clientY - dragState.startY
-  node.x = dragState.nodeStartX + dx
-  node.y = dragState.nodeStartY + dy
+  nodeOverrides[dragState.nodeId] = {
+    x: dragState.nodeStartX + dx,
+    y: dragState.nodeStartY + dy,
+  }
 }
 
 function endDrag() {
@@ -289,6 +291,8 @@ function endDrag() {
 }
 
 function getNodePosition(nodeId: string) {
+  // 优先使用拖拽覆盖位置
+  if (nodeOverrides[nodeId]) return nodeOverrides[nodeId]
   const node = flowData.value.nodes.find(n => n.id === nodeId)
   return node ? { x: node.x, y: node.y } : { x: 0, y: 0 }
 }
@@ -308,6 +312,7 @@ function selectNode(nodeId: string) {
 // 从 scheme store 初始化数据
 if (scheme.value) {
   schemeName.value = scheme.value.name
+  schemeHomePageId.value = scheme.value.homePageId ?? ''
   schemePages.value = [...scheme.value.layout.pages]
 }
 
@@ -320,8 +325,18 @@ function addPageToScheme(pageId: string) {
 }
 
 function removePageFromScheme(index: number) {
+  const removedId = schemePages.value[index]?.pageId
   schemePages.value.splice(index, 1)
   schemePages.value.forEach((p, i) => (p.order = i))
+  // 如果移除的是主页面，重置
+  if (removedId === schemeHomePageId.value) {
+    schemeHomePageId.value = schemePages.value[0]?.pageId ?? ''
+  }
+}
+
+function setHomePage(pageId: string) {
+  schemeHomePageId.value = pageId
+  saveScheme()
 }
 
 function movePageUp(index: number) {
@@ -360,6 +375,7 @@ function saveScheme() {
   schemeStore.updateScheme({
     ...scheme.value,
     name: schemeName.value,
+    homePageId: schemeHomePageId.value,
     layout: {
       ...scheme.value.layout,
       pages: schemePages.value,
@@ -418,11 +434,14 @@ function exportScheme() {
 
         <div v-for="(sp, idx) in schemePages" :key="idx"
           class="flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors"
-          :style="idx === currentPageIndex ? 'background-color: var(--color-primary); opacity: 0.2;' : ''"
+          :style="idx === currentPageIndex ? 'background-color: rgba(59,130,246,0.15);' : ''"
           @click="currentPageIndex = idx"
         >
           <span class="text-xs w-5 text-center" style="color: var(--color-text-dim);">{{ idx + 1 }}</span>
           <span class="text-sm flex-1 truncate">{{ availablePages.find(p => p.id === sp.pageId)?.name ?? sp.pageId }}</span>
+          <!-- 主页面标记/设置按钮 -->
+          <button v-if="sp.pageId === schemeHomePageId" @click.stop class="p-0.5" title="主页面（默认启动）" style="color: var(--color-primary);"><Icon icon="solar:home-2-bold" class="text-sm" /></button>
+          <button v-else @click.stop="setHomePage(sp.pageId)" class="p-0.5" title="设为主页面" style="color: var(--color-text-dim);"><Icon icon="solar:home-2-linear" class="text-sm" /></button>
           <div class="flex items-center gap-0.5">
             <button @click.stop="movePageUp(idx)" class="p-0.5" style="color: var(--color-text-dim);"><Icon icon="solar:alt-arrow-up-bold" class="text-xs" /></button>
             <button @click.stop="movePageDown(idx)" class="p-0.5" style="color: var(--color-text-dim);"><Icon icon="solar:alt-arrow-down-bold" class="text-xs" /></button>
@@ -516,7 +535,7 @@ function exportScheme() {
       <svg class="absolute inset-0 w-full h-full pointer-events-none" style="z-index: 1;">
         <defs>
           <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-            <polygon points="0 0, 8 3, 0 6" fill="var(--color-text-dim)" />
+            <polygon points="0 0, 8 3, 0 6" fill="#3b82f6" />
           </marker>
         </defs>
         <line
@@ -526,9 +545,9 @@ function exportScheme() {
           :y1="getNodePosition(edge.from).y"
           :x2="getNodePosition(edge.to).x"
           :y2="getNodePosition(edge.to).y"
-          stroke="var(--color-text-dim)"
-          stroke-width="1.5"
-          stroke-dasharray="4 3"
+          stroke="#3b82f6"
+          stroke-width="2"
+          opacity="0.7"
           marker-end="url(#arrowhead)"
         />
       </svg>
