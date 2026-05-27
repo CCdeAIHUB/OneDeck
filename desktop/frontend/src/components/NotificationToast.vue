@@ -25,7 +25,7 @@ const colorMap: Record<NotificationType, { bg: string; border: string; icon: str
       <div
         v-for="n in notificationStore.notifications"
         :key="n.id"
-        class="pointer-events-auto rounded-lg px-4 py-3 flex items-start gap-3 shadow-lg cursor-pointer"
+        class="pointer-events-auto rounded-lg px-4 py-3 flex items-center gap-3 shadow-lg cursor-pointer"
         :style="{
           backgroundColor: `var(--color-bg-card)`,
           border: `1px solid ${colorMap[n.type].border}`,
@@ -33,13 +33,13 @@ const colorMap: Record<NotificationType, { bg: string; border: string; icon: str
         }"
         @click="notificationStore.remove(n.id)"
       >
-        <Icon :icon="iconMap[n.type]" class="text-lg shrink-0 mt-0.5" :style="{ color: colorMap[n.type].icon }" />
+        <Icon :icon="iconMap[n.type]" class="text-lg shrink-0" :style="{ color: colorMap[n.type].icon }" />
         <div class="flex-1 min-w-0">
           <p class="text-sm font-semibold" style="color: var(--color-text);">{{ n.title }}</p>
           <p v-if="n.message" class="text-xs mt-0.5" style="color: var(--color-text-muted);">{{ n.message }}</p>
         </div>
-        <button class="shrink-0" style="color: var(--color-text-dim);" @click.stop="notificationStore.remove(n.id)">
-          <Icon icon="solar:close-circle-bold" class="text-sm" />
+        <button class="shrink-0 flex items-center justify-center w-5 h-5" style="color: var(--color-text-dim);" @click.stop="notificationStore.remove(n.id)">
+          <Icon icon="solar:close-circle-bold" class="text-base" />
         </button>
       </div>
     </TransitionGroup>

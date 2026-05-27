@@ -22,7 +22,7 @@ public class AppHost
         _storageService = new StorageService();
         _logService = new LogService(_storageService);
         _pluginService = new PluginService(_storageService, _logService);
-        _jsApiService = new JsApiService(_logService);
+        _jsApiService = new JsApiService(_logService, _storageService);
         _schemeService = new SchemeService(_storageService, _logService);
         _webSocketService = new WebSocketService(
             _logService,

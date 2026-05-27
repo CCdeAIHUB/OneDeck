@@ -3,11 +3,13 @@ import { Icon } from '@iconify/vue'
 import PageHeader from '@/components/PageHeader.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { usePluginStore } from '@/stores/plugins'
+import { useNotificationStore } from '@/stores/notification'
 import { useRouter } from 'vue-router'
 import { ref } from 'vue'
 
 const pluginStore = usePluginStore()
 const router = useRouter()
+const notify = useNotificationStore()
 
 const showCreateDialog = ref(false)
 const newPluginName = ref('')
@@ -55,6 +57,7 @@ function askDeletePlugin(id: string) {
 function confirmDeletePlugin() {
   if (deleteTargetId.value) {
     pluginStore.removePlugin(deleteTargetId.value)
+    notify.success('插件已删除')
   }
   showDeleteConfirm.value = false
   deleteTargetId.value = null
@@ -68,6 +71,42 @@ function exportPlugin(plugin: any) {
   a.download = `plugin-${plugin.name}-${Date.now()}.json`
   a.click()
   URL.revokeObjectURL(url)
+  notify.success('插件已导出')
+}
+
+function exportAllPlugins() {
+  const blob = new Blob([JSON.stringify(pluginStore.plugins, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `onedesk-plugins-${Date.now()}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+  notify.success('插件已导出')
+}
+
+function importPlugins() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.json'
+  input.onchange = (e) => {
+    const file = (e.target as HTMLInputElement).files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target?.result as string)
+        if (Array.isArray(data)) {
+          data.forEach((p: any) => pluginStore.addPlugin(p))
+          notify.success(`已导入 ${data.length} 个插件`)
+        }
+      } catch {
+        notify.error('导入失败：文件格式无效')
+      }
+    }
+    reader.readAsText(file)
+  }
+  input.click()
 }
 </script>
 
@@ -75,6 +114,14 @@ function exportPlugin(plugin: any) {
   <div>
     <PageHeader title="插件" subtitle="开发和编辑插件代码" icon="solar:code-square-bold">
       <template #actions>
+        <button class="btn-secondary" @click="importPlugins">
+          <Icon icon="solar:import-bold" class="text-base" />
+          导入
+        </button>
+        <button class="btn-secondary" @click="exportAllPlugins">
+          <Icon icon="solar:export-bold" class="text-base" />
+          导出
+        </button>
         <button class="btn-primary" @click="createPlugin">
           <Icon icon="solar:add-circle-bold" class="text-base" />
           新建插件
@@ -141,8 +188,8 @@ function exportPlugin(plugin: any) {
     </div>
 
     <!-- 创建插件对话框 -->
-    <div v-if="showCreateDialog" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showCreateDialog = false">
-      <div class="rounded-xl p-6 w-96 space-y-4" style="background-color: var(--color-bg-card);">
+    <div v-if="showCreateDialog" class="dialog-overlay" @click.self="showCreateDialog = false">
+      <div class="dialog-card space-y-4">
         <h3 class="text-lg font-bold">新建插件</h3>
         <div>
           <label class="text-sm" style="color: var(--color-text-muted);">插件名称</label>

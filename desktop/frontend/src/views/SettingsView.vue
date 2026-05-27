@@ -3,14 +3,10 @@ import { Icon } from '@iconify/vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { useThemeStore, type ThemeMode } from '@/stores/theme'
 import { useLogStore, type LogLevel } from '@/stores/logs'
-import { useDesignStore } from '@/stores/design'
-import { useSchemeStore } from '@/stores/schemes'
 import { ref, computed, nextTick, watch } from 'vue'
 
 const themeStore = useThemeStore()
 const logStore = useLogStore()
-const designStore = useDesignStore()
-const schemeStore = useSchemeStore()
 
 const wsPort = ref(9720)
 const autoStart = ref(false)
@@ -31,7 +27,6 @@ function saveSettings() {
 // ==================== 日志查看器 ====================
 const logsContainer = ref<HTMLElement | null>(null)
 const autoScroll = ref(true)
-const logSearchText = ref('')
 
 const levelOptions: { value: LogLevel | null; label: string; color: string }[] = [
   { value: null, label: '全部', color: 'var(--color-text-muted)' },
@@ -70,74 +65,6 @@ watch(
     }
   }
 )
-
-// ==================== 导出/导入 ====================
-function exportData(type: 'schemes' | 'pages' | 'components' | 'all') {
-  let data: unknown
-  let filename: string
-  switch (type) {
-    case 'schemes':
-      data = schemeStore.schemes
-      filename = `onedesk-schemes-${Date.now()}.json`
-      break
-    case 'pages':
-      data = designStore.pages
-      filename = `onedesk-pages-${Date.now()}.json`
-      break
-    case 'components':
-      data = designStore.components
-      filename = `onedesk-components-${Date.now()}.json`
-      break
-    case 'all':
-      data = {
-        schemes: schemeStore.schemes,
-        pages: designStore.pages,
-        components: designStore.components,
-        exportedAt: new Date().toISOString(),
-        version: '0.1.0',
-      }
-      filename = `onedesk-backup-${Date.now()}.json`
-      break
-  }
-
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
-function importData() {
-  const input = document.createElement('input')
-  input.type = 'file'
-  input.accept = '.json'
-  input.onchange = (e) => {
-    const file = (e.target as HTMLInputElement).files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = (ev) => {
-      try {
-        const data = JSON.parse(ev.target?.result as string)
-        if (data.schemes || data.pages || data.components) {
-          // 完整备份格式
-          if (data.schemes) schemeStore.setSchemes(data.schemes)
-          if (data.pages) data.pages.forEach((p: any) => designStore.pages.push(p))
-          if (data.components) data.components.forEach((c: any) => designStore.components.push(c))
-        } else if (Array.isArray(data)) {
-          // 单类型数据，根据文件内容自动判断
-          // 无法自动判断，提示用户
-          alert('请使用完整备份格式导入，或在对应管理页面导入')
-        }
-      } catch {
-        alert('导入失败：文件格式无效')
-      }
-    }
-    reader.readAsText(file)
-  }
-  input.click()
-}
 </script>
 
 <template>
@@ -233,56 +160,6 @@ function importData() {
                 class="absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform duration-200"
                 :class="minimizeToTray ? 'translate-x-5' : 'translate-x-0'"
               />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 数据管理 -->
-      <div class="rounded-xl p-5 border" style="background-color: var(--color-bg-card); border-color: var(--color-border);">
-        <h3 class="font-semibold mb-4">数据管理</h3>
-        <div class="space-y-3">
-          <p class="text-xs" style="color: var(--color-text-dim);">导出或导入方案、页面、组件数据</p>
-          <div class="flex flex-wrap gap-2">
-            <button
-              class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors"
-              style="background-color: var(--color-bg-surface); color: var(--color-text-muted); border: 1px solid var(--color-border);"
-              @click="exportData('all')"
-            >
-              <Icon icon="solar:download-bold" class="text-sm" />
-              导出全部
-            </button>
-            <button
-              class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors"
-              style="background-color: var(--color-bg-surface); color: var(--color-text-muted); border: 1px solid var(--color-border);"
-              @click="exportData('schemes')"
-            >
-              <Icon icon="solar:download-bold" class="text-sm" />
-              导出方案
-            </button>
-            <button
-              class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors"
-              style="background-color: var(--color-bg-surface); color: var(--color-text-muted); border: 1px solid var(--color-border);"
-              @click="exportData('pages')"
-            >
-              <Icon icon="solar:download-bold" class="text-sm" />
-              导出页面
-            </button>
-            <button
-              class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors"
-              style="background-color: var(--color-bg-surface); color: var(--color-text-muted); border: 1px solid var(--color-border);"
-              @click="exportData('components')"
-            >
-              <Icon icon="solar:download-bold" class="text-sm" />
-              导出组件
-            </button>
-            <button
-              class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors"
-              style="background-color: var(--color-primary); color: white;"
-              @click="importData"
-            >
-              <Icon icon="solar:upload-bold" class="text-sm" />
-              导入数据
             </button>
           </div>
         </div>

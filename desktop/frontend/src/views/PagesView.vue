@@ -3,11 +3,13 @@ import { Icon } from '@iconify/vue'
 import PageHeader from '@/components/PageHeader.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useDesignStore } from '@/stores/design'
+import { useNotificationStore } from '@/stores/notification'
 import { useRouter } from 'vue-router'
 import { ref } from 'vue'
 
 const designStore = useDesignStore()
 const router = useRouter()
+const notify = useNotificationStore()
 
 const showDeleteConfirm = ref(false)
 const deleteTargetId = ref<string | null>(null)
@@ -32,6 +34,7 @@ function askDeletePage(id: string) {
 function confirmDeletePage() {
   if (deleteTargetId.value) {
     designStore.deletePage(deleteTargetId.value)
+    notify.success('页面已删除')
   }
   showDeleteConfirm.value = false
   deleteTargetId.value = null
@@ -45,6 +48,45 @@ function exportPage(page: any) {
   a.download = `page-${page.name}-${Date.now()}.json`
   a.click()
   URL.revokeObjectURL(url)
+  notify.success('页面已导出')
+}
+
+function exportAllPages() {
+  const blob = new Blob([JSON.stringify(designStore.pages, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `onedesk-pages-${Date.now()}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+  notify.success('页面已导出')
+}
+
+function importPages() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.json'
+  input.onchange = (e) => {
+    const file = (e.target as HTMLInputElement).files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target?.result as string)
+        if (Array.isArray(data)) {
+          data.forEach((p: any) => designStore.pages.push(p))
+          notify.success(`已导入 ${data.length} 个页面`)
+        } else if (data.pages) {
+          data.pages.forEach((p: any) => designStore.pages.push(p))
+          notify.success(`已导入 ${data.pages.length} 个页面`)
+        }
+      } catch {
+        notify.error('导入失败：文件格式无效')
+      }
+    }
+    reader.readAsText(file)
+  }
+  input.click()
 }
 </script>
 
@@ -52,6 +94,14 @@ function exportPage(page: any) {
   <div>
     <PageHeader title="页面" subtitle="设计移动端页面布局" icon="solar:clipboard-list-bold">
       <template #actions>
+        <button class="btn-secondary" @click="importPages">
+          <Icon icon="solar:import-bold" class="text-base" />
+          导入
+        </button>
+        <button class="btn-secondary" @click="exportAllPages">
+          <Icon icon="solar:export-bold" class="text-base" />
+          导出
+        </button>
         <button class="btn-primary" @click="createNew">
           <Icon icon="solar:add-circle-bold" class="text-base" />
           新建页面
@@ -106,14 +156,15 @@ function exportPage(page: any) {
             :style="{
               gridTemplateColumns: `repeat(${page.columns}, 1fr)`,
               gridTemplateRows: `repeat(${page.rows}, 1fr)`,
-              backgroundColor: page.background.type === 'color' ? page.background.color : 'var(--color-bg-surface)'
+              backgroundColor: page.background.type === 'color' ? page.background.color : 'var(--color-bg-surface)',
+              placeContent: 'center',
             }"
           >
             <div
               v-for="cell in page.cells"
               :key="cell.id"
               class="rounded-sm"
-              :style="{ backgroundColor: cell.componentId ? 'rgba(59,130,246,0.3)' : 'var(--color-bg-surface)', gridColumn: `${cell.column + 1} / span ${cell.columnSpan}`, gridRow: `${cell.row + 1} / span ${cell.rowSpan}` }"
+              :style="{ backgroundColor: cell.componentId ? 'rgba(59,130,246,0.3)' : 'var(--color-bg-surface)', gridColumn: `${cell.column + 1} / span ${cell.columnSpan}`, gridRow: `${cell.row + 1} / span ${cell.rowSpan}`, aspectRatio: '1' }"
             />
           </div>
         </div>

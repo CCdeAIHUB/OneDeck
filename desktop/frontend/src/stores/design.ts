@@ -31,6 +31,30 @@ export interface PageBackground {
   videoUrl: string
 }
 
+export interface CellTrigger {
+  /** 触发类型 */
+  type: 'none' | 'setParam' | 'navigatePage' | 'callApi'
+  /** setParam: 参数键名; navigatePage: 页面ID; callApi: API端点 */
+  target: string
+  /** setParam: 新值; callApi: 参数 */
+  value: string
+}
+
+export interface CellStyle {
+  backgroundColor: string
+  text: string
+  textColor: string
+  textPosition: 'center' | 'top' | 'bottom'
+  fontFamily: string
+  fontSize: number
+  bold: boolean
+  italic: boolean
+  underline: boolean
+  strikethrough: boolean
+  backgroundImage: string
+  backgroundVideo: string
+}
+
 export interface PageCell {
   id: string
   row: number
@@ -39,6 +63,10 @@ export interface PageCell {
   columnSpan: number
   /** 关联的组件ID */
   componentId: string | null
+  /** 触发器 */
+  trigger: CellTrigger
+  /** 格子样式 */
+  style: CellStyle
 }
 
 // ==================== 组件设计模型 ====================
@@ -69,6 +97,29 @@ export interface ComponentAsset {
   type: 'image' | 'video'
   url: string
   size: number
+}
+
+// ==================== 默认值工厂 ====================
+
+export function defaultCellTrigger(): CellTrigger {
+  return { type: 'none', target: '', value: '' }
+}
+
+export function defaultCellStyle(): CellStyle {
+  return {
+    backgroundColor: 'transparent',
+    text: '',
+    textColor: '#ffffff',
+    textPosition: 'center',
+    fontFamily: 'system-ui',
+    fontSize: 14,
+    bold: false,
+    italic: false,
+    underline: false,
+    strikethrough: false,
+    backgroundImage: '',
+    backgroundVideo: '',
+  }
 }
 
 // ==================== 手势触发模型 ====================
@@ -227,6 +278,8 @@ export const useDesignStore = defineStore('design', () => {
           rowSpan: 1,
           columnSpan: 1,
           componentId: null,
+          trigger: defaultCellTrigger(),
+          style: defaultCellStyle(),
         })
       }
     }

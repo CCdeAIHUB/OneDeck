@@ -3,11 +3,13 @@ import { Icon } from '@iconify/vue'
 import PageHeader from '@/components/PageHeader.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useSchemeStore } from '@/stores/schemes'
+import { useNotificationStore } from '@/stores/notification'
 import { useRouter } from 'vue-router'
 import { ref } from 'vue'
 
 const schemeStore = useSchemeStore()
 const router = useRouter()
+const notify = useNotificationStore()
 
 const showCreateDialog = ref(false)
 const newSchemeName = ref('')
@@ -56,9 +58,48 @@ function askDeleteScheme(id: string) {
 function confirmDeleteScheme() {
   if (deleteTargetId.value) {
     schemeStore.removeScheme(deleteTargetId.value)
+    notify.success('方案已删除')
   }
   showDeleteConfirm.value = false
   deleteTargetId.value = null
+}
+
+function exportSchemes() {
+  const blob = new Blob([JSON.stringify(schemeStore.schemes, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `onedesk-schemes-${Date.now()}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+  notify.success('方案已导出')
+}
+
+function importSchemes() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.json'
+  input.onchange = (e) => {
+    const file = (e.target as HTMLInputElement).files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target?.result as string)
+        if (Array.isArray(data)) {
+          data.forEach((s: any) => schemeStore.addScheme(s))
+          notify.success(`已导入 ${data.length} 个方案`)
+        } else if (data.schemes) {
+          data.schemes.forEach((s: any) => schemeStore.addScheme(s))
+          notify.success(`已导入 ${data.schemes.length} 个方案`)
+        }
+      } catch {
+        notify.error('导入失败：文件格式无效')
+      }
+    }
+    reader.readAsText(file)
+  }
+  input.click()
 }
 </script>
 
@@ -66,6 +107,14 @@ function confirmDeleteScheme() {
   <div>
     <PageHeader title="方案管理" subtitle="设计移动端界面方案" icon="solar:layers-bold">
       <template #actions>
+        <button class="btn-secondary" @click="importSchemes">
+          <Icon icon="solar:import-bold" class="text-base" />
+          导入
+        </button>
+        <button class="btn-secondary" @click="exportSchemes">
+          <Icon icon="solar:export-bold" class="text-base" />
+          导出
+        </button>
         <button class="btn-primary" @click="createScheme">
           <Icon icon="solar:add-circle-bold" class="text-base" />
           新建方案
@@ -118,8 +167,8 @@ function confirmDeleteScheme() {
     </div>
 
     <!-- 创建方案对话框 -->
-    <div v-if="showCreateDialog" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showCreateDialog = false">
-      <div class="rounded-xl p-6 w-96 space-y-4" style="background-color: var(--color-bg-card);">
+    <div v-if="showCreateDialog" class="dialog-overlay" @click.self="showCreateDialog = false">
+      <div class="dialog-card space-y-4">
         <h3 class="text-lg font-bold">新建方案</h3>
         <div>
           <label class="text-sm" style="color: var(--color-text-muted);">方案名称</label>

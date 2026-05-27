@@ -3,6 +3,7 @@ import { Icon } from '@iconify/vue'
 import { useDesignStore, type ComponentAsset } from '@/stores/design'
 import { useDeviceStore } from '@/stores/devices'
 import { useNotificationStore } from '@/stores/notification'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import CodeEditor from '@/components/CodeEditor.vue'
 import { useRoute, useRouter } from 'vue-router'
 import { computed, ref, watch } from 'vue'
@@ -25,6 +26,9 @@ const activeTab = ref<'template' | 'script' | 'style'>('template')
 const previewHtml = ref('')
 const scriptSyntax = ref<'options' | 'setup'>('setup')
 const previewRef = ref<HTMLElement | null>(null)
+// 语法切换确认对话框
+const showSyntaxConfirm = ref(false)
+const pendingSyntax = ref<'options' | 'setup' | null>(null)
 
 // 默认代码模板
 const SETUP_DEFAULT = `import { ref, onUnmounted } from 'vue'\nimport { useSharedParams } from '@/stores/sharedParams'\n\nconst message = ref('Hello')\nconst sharedParams = useSharedParams()\n\n// 通过 JSAPI 获取设备数据\n// const battery = ref(null)\n// async function fetchBattery() {\n//   battery.value = await context.callApi('device.battery')\n// }`
@@ -33,6 +37,8 @@ const OPTIONS_DEFAULT = `export default {\n  data() {\n    return { message: 'He
 
 // 标记用户是否手动编辑过代码
 const hasUserEdits = ref(false)
+// 标记是否由自动保存触发（防止 watch 循环）
+const isAutoSave = ref(false)
 
 interface DataBinding {
   id: string
@@ -56,29 +62,65 @@ const jsApiSources = [
   { value: 'storage.get', label: '存储数据' },
 ]
 
-watch(comp, (c) => {
+watch(comp, (c, oldC) => {
   if (!c) return
+  // 跳过由自动保存触发的更新
+  if (isAutoSave.value) { isAutoSave.value = false; return }
+  // 首次加载：从 store 读取所有数据
+  if (!oldC) {
+    compName.value = c.name
+    compDescription.value = c.description
+    templateCode.value = c.templateCode
+    scriptCode.value = c.scriptCode
+    styleCode.value = c.styleCode
+    scriptSyntax.value = c.scriptSyntax ?? 'setup'
+    return
+  }
+  // 后续更新（如截图保存）：只同步非编辑器字段，保留当前编辑内容
   compName.value = c.name
   compDescription.value = c.description
-  templateCode.value = c.templateCode
-  scriptCode.value = c.scriptCode
-  styleCode.value = c.styleCode
   scriptSyntax.value = c.scriptSyntax ?? 'setup'
+  if (templateCode.value !== c.templateCode) templateCode.value = c.templateCode
+  if (scriptCode.value !== c.scriptCode) scriptCode.value = c.scriptCode
+  if (styleCode.value !== c.styleCode) styleCode.value = c.styleCode
 }, { immediate: true })
 
-// 监听代码变化标记用户编辑
-watch([templateCode, scriptCode, styleCode], () => {
+// 监听代码变化标记用户编辑 + 实时保存到 store
+watch([templateCode, scriptCode, styleCode, scriptSyntax], () => {
   hasUserEdits.value = true
-}, { once: true })
+  // 实时保存代码到 store（防止任何情况下代码丢失）
+  if (comp.value) {
+    isAutoSave.value = true
+    designStore.updateComponent({
+      ...comp.value,
+      templateCode: templateCode.value,
+      scriptCode: scriptCode.value,
+      styleCode: styleCode.value,
+      scriptSyntax: scriptSyntax.value,
+    })
+  }
+})
 
 function switchScriptSyntax(newSyntax: 'options' | 'setup') {
   if (scriptSyntax.value === newSyntax) return
   if (hasUserEdits.value && scriptCode.value.trim()) {
-    if (!confirm('切换语法将替换当前逻辑代码内容，确定切换？')) return
+    pendingSyntax.value = newSyntax
+    showSyntaxConfirm.value = true
+    return
   }
   scriptSyntax.value = newSyntax
   scriptCode.value = newSyntax === 'setup' ? SETUP_DEFAULT : OPTIONS_DEFAULT
   hasUserEdits.value = false
+}
+
+function confirmSwitchSyntax() {
+  if (pendingSyntax.value) {
+    scriptSyntax.value = pendingSyntax.value
+    scriptCode.value = pendingSyntax.value === 'setup' ? SETUP_DEFAULT : OPTIONS_DEFAULT
+    hasUserEdits.value = false
+  }
+  showSyntaxConfirm.value = false
+  pendingSyntax.value = null
 }
 
 function save() {
@@ -159,7 +201,47 @@ function generateDataImportCode(): string {
 }
 
 function generatePreview() {
-  const html = `<div style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:#111827;color:white;overflow:hidden;"><style>${styleCode.value}</style><div class="comp">${templateCode.value.replace(/\{\{.*?\}\}/g, '预览')}</div></div>`
+  // 预览前先自动保存当前代码到 store，防止代码丢失
+  if (comp.value) {
+    designStore.updateComponent({
+      ...comp.value,
+      templateCode: templateCode.value,
+      scriptCode: scriptCode.value,
+      styleCode: styleCode.value,
+      scriptSyntax: scriptSyntax.value,
+    })
+  }
+
+  // 从脚本代码中提取变量值
+  const values: Record<string, string> = {}
+
+  if (scriptSyntax.value === 'setup') {
+    // 匹配: const/let/var xxx = ref('value') 或 ref("value") 或 ref(123) 或 ref(true)
+    const refRegex = /(?:const|let|var)\s+(\w+)\s*=\s*ref\s*\(\s*(?:'([^']*)'|"([^"]*)"|`([^`]*)`|(\d+(?:\.\d+)?)|(true|false))\s*\)/g
+    let m
+    while ((m = refRegex.exec(scriptCode.value)) !== null) {
+      values[m[1]] = m[2] ?? m[3] ?? m[4] ?? m[5] ?? m[6] ?? ''
+    }
+  } else {
+    // Options API: 解析 data() return 中的属性
+    const dataMatch = scriptCode.value.match(/data\s*\(\s*\)\s*\{[\s\S]*?return\s*\{([\s\S]*?)\}/)
+    if (dataMatch) {
+      const propRegex = /(\w+)\s*:\s*(?:'([^']*)'|"([^"]*)"|(\d+(?:\.\d+)?)|(true|false))/g
+      let m
+      while ((m = propRegex.exec(dataMatch[1])) !== null) {
+        values[m[1]] = m[2] ?? m[3] ?? m[4] ?? m[5] ?? ''
+      }
+    }
+  }
+
+  // 替换模板中的 {{ xxx }} 为提取的变量值
+  let rendered = templateCode.value.replace(/\{\{\s*([^}]+)\s*\}\}/g, (_, expr) => {
+    const varName = expr.trim()
+    if (values[varName] !== undefined) return values[varName]
+    return expr
+  })
+
+  const html = `<div style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:#111827;color:white;overflow:hidden;"><style>${styleCode.value}</style><div class="comp">${rendered}</div></div>`
   previewHtml.value = html
 }
 
@@ -409,4 +491,14 @@ const devGuide = [
     <p>组件未找到</p>
     <button class="mt-4 px-4 py-2 rounded-lg text-sm" style="background-color: var(--color-bg-surface);" @click="goBack">返回</button>
   </div>
+
+  <!-- 语法切换确认 -->
+  <ConfirmDialog
+    v-if="showSyntaxConfirm"
+    title="切换语法"
+    message="切换语法将替换当前逻辑代码内容，确定切换？"
+    confirm-text="切换"
+    @confirm="confirmSwitchSyntax"
+    @cancel="showSyntaxConfirm = false; pendingSyntax = null"
+  />
 </template>

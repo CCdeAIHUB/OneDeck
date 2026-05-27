@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import { useDesignStore, type PageCell } from '@/stores/design'
+import { useDesignStore, type PageCell, type CellTrigger, type CellStyle, defaultCellTrigger, defaultCellStyle } from '@/stores/design'
+import { useSharedParamsStore } from '@/stores/sharedParams'
 import { useDeviceStore } from '@/stores/devices'
 import { useRoute, useRouter } from 'vue-router'
 import { computed, ref, watch } from 'vue'
@@ -9,6 +10,7 @@ const route = useRoute()
 const router = useRouter()
 const designStore = useDesignStore()
 const deviceStore = useDeviceStore()
+const sharedParamsStore = useSharedParamsStore()
 
 const pageId = computed(() => route.params.id as string)
 const page = computed(() => designStore.pages.find((p) => p.id === pageId.value))
@@ -31,7 +33,58 @@ const bgColor = ref('#111827')
 const bgImageUrl = ref('')
 const bgVideoUrl = ref('')
 
-// 本地文件选择
+// 格子样式编辑中的本地状态
+const cellBgColor = ref('transparent')
+const cellText = ref('')
+const cellTextColor = ref('#ffffff')
+const cellTextPosition = ref<'center' | 'top' | 'bottom'>('center')
+const cellFontFamily = ref('system-ui')
+const cellFontSize = ref(14)
+const cellBold = ref(false)
+const cellItalic = ref(false)
+const cellUnderline = ref(false)
+const cellStrikethrough = ref(false)
+const cellBgImage = ref('')
+const cellBgVideo = ref('')
+
+// 触发器编辑中的本地状态
+const triggerType = ref<'none' | 'setParam' | 'navigatePage' | 'callApi'>('none')
+const triggerTarget = ref('')
+const triggerValue = ref('')
+
+// 本地文件选择 - 格子背景图片
+function pickCellBgImage() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'image/*'
+  input.onchange = () => {
+    const file = input.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      cellBgImage.value = e.target?.result as string
+      applyCellStyle()
+    }
+    reader.readAsDataURL(file)
+  }
+  input.click()
+}
+
+// 本地文件选择 - 格子背景视频
+function pickCellBgVideo() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'video/*'
+  input.onchange = () => {
+    const file = input.files?.[0]
+    if (!file) return
+    cellBgVideo.value = URL.createObjectURL(file)
+    applyCellStyle()
+  }
+  input.click()
+}
+
+// 本地文件选择 - 页面背景
 function pickLocalImage() {
   const input = document.createElement('input')
   input.type = 'file'
@@ -56,8 +109,7 @@ function pickLocalVideo() {
   input.onchange = () => {
     const file = input.files?.[0]
     if (!file) return
-    const url = URL.createObjectURL(file)
-    bgVideoUrl.value = url
+    bgVideoUrl.value = URL.createObjectURL(file)
     savePage()
   }
   input.click()
@@ -78,6 +130,28 @@ watch(page, (p) => {
   bgColor.value = p.background.color
   bgImageUrl.value = p.background.imageUrl
   bgVideoUrl.value = p.background.videoUrl
+}, { immediate: true })
+
+// 同步选中格子的样式到本地状态
+watch(selectedCell, (cell) => {
+  if (!cell) return
+  const s = cell.style ?? defaultCellStyle()
+  cellBgColor.value = s.backgroundColor
+  cellText.value = s.text
+  cellTextColor.value = s.textColor
+  cellTextPosition.value = s.textPosition
+  cellFontFamily.value = s.fontFamily
+  cellFontSize.value = s.fontSize
+  cellBold.value = s.bold
+  cellItalic.value = s.italic
+  cellUnderline.value = s.underline
+  cellStrikethrough.value = s.strikethrough
+  cellBgImage.value = s.backgroundImage
+  cellBgVideo.value = s.backgroundVideo
+  const t = cell.trigger ?? defaultCellTrigger()
+  triggerType.value = t.type
+  triggerTarget.value = t.target
+  triggerValue.value = t.value
 }, { immediate: true })
 
 function applyGridChange() {
@@ -114,9 +188,42 @@ function updateCellProp(key: keyof PageCell, value: unknown) {
   designStore.updateCell(pageId.value, selectedCell.value.id, { [key]: value })
 }
 
+/** 应用格子样式到 store */
+function applyCellStyle() {
+  if (!selectedCell.value || !page.value) return
+  const style: CellStyle = {
+    backgroundColor: cellBgColor.value,
+    text: cellText.value,
+    textColor: cellTextColor.value,
+    textPosition: cellTextPosition.value,
+    fontFamily: cellFontFamily.value,
+    fontSize: cellFontSize.value,
+    bold: cellBold.value,
+    italic: cellItalic.value,
+    underline: cellUnderline.value,
+    strikethrough: cellStrikethrough.value,
+    backgroundImage: cellBgImage.value,
+    backgroundVideo: cellBgVideo.value,
+  }
+  designStore.updateCell(pageId.value, selectedCell.value.id, { style })
+}
+
+/** 应用触发器到 store */
+function applyTrigger() {
+  if (!selectedCell.value || !page.value) return
+  const trigger: CellTrigger = {
+    type: triggerType.value,
+    target: triggerTarget.value,
+    value: triggerValue.value,
+  }
+  designStore.updateCell(pageId.value, selectedCell.value.id, { trigger })
+}
+
 function goBack() { router.push('/pages') }
 
 const availableComponents = computed(() => designStore.components)
+const availablePages = computed(() => designStore.pages.filter(p => p.id !== pageId.value))
+const sharedParamKeys = computed(() => sharedParamsStore.keys())
 
 // 页面预览开关：开启后用组件代码渲染，关闭只显示图标/预览图
 const enablePreview = ref(false)
@@ -145,11 +252,56 @@ const devicePreviewStyle = computed(() => {
   return { width: '640px', height: '360px' }
 })
 
+// 方形格子尺寸计算：基于可用区域 min(宽/列, 高/行)
+const gridSizeStyle = computed(() => {
+  const device = deviceStore.selectedDevice
+  let containerW: number, containerH: number
+  if (device && device.screenWidth && device.screenHeight) {
+    const ratio = device.screenWidth / device.screenHeight
+    const maxW = 480, maxH = 700
+    if (ratio > 1) { containerW = maxW; containerH = maxW / ratio }
+    else { containerH = maxH; containerW = maxH * ratio }
+  } else {
+    containerW = pageOrientation.value === 'vertical' ? 360 : 640
+    containerH = pageOrientation.value === 'vertical' ? 640 : 360
+  }
+  // 减去 padding
+  const pad = pageCustomPadding.value
+    ? paddingTop.value + paddingBottom.value
+    : 32
+  const padH = pageCustomPadding.value
+    ? paddingLeft.value + paddingRight.value
+    : 32
+  const availW = containerW - padH
+  const availH = containerH - pad
+  const cellW = availW / pageColumns.value
+  const cellH = availH / pageRows.value
+  const cellSize = Math.floor(Math.min(cellW, cellH))
+  return cellSize
+})
+
 const deviceLabel = computed(() => {
   const device = deviceStore.selectedDevice
   if (device) return `${device.deviceName} (${device.screenWidth}x${device.screenHeight})`
   return pageOrientation.value === 'vertical' ? '默认竖屏 9:16' : '默认横屏 16:9'
 })
+
+// 格子文本位置样式
+function textPositionStyle(pos: string) {
+  switch (pos) {
+    case 'top': return { alignItems: 'flex-start' as const, paddingTop: '4px' }
+    case 'bottom': return { alignItems: 'flex-end' as const, paddingBottom: '4px' }
+    default: return { alignItems: 'center' as const }
+  }
+}
+
+// 格子文字装饰样式
+function textDecorationStyle(style: CellStyle): string {
+  const deco: string[] = []
+  if (style.underline) deco.push('underline')
+  if (style.strikethrough) deco.push('line-through')
+  return deco.length > 0 ? deco.join(' ') : 'none'
+}
 </script>
 
 <template>
@@ -288,6 +440,174 @@ const deviceLabel = computed(() => {
             <option v-for="comp in availableComponents" :key="comp.id" :value="comp.id">{{ comp.name }}</option>
           </select>
         </div>
+
+        <!-- 触发器设置 -->
+        <div class="pt-2 mt-2" style="border-top: 1px solid var(--color-border-subtle);">
+          <h4 class="text-xs font-semibold mb-2 flex items-center gap-1" style="color: var(--color-text-muted);">
+            <Icon icon="solar:bolt-bold" class="text-sm" style="color: var(--color-primary);" />
+            触发动作
+          </h4>
+          <div class="space-y-2">
+            <div>
+              <label class="text-xs" style="color: var(--color-text-dim);">动作类型</label>
+              <select v-model="triggerType" @change="applyTrigger" class="w-full mt-0.5 px-2 py-1.5 rounded text-xs focus:outline-none"
+                style="background-color: var(--color-bg-surface); border: 1px solid var(--color-border); color: var(--color-text);">
+                <option value="none">无</option>
+                <option value="setParam">修改公共参数</option>
+                <option value="navigatePage">跳转页面</option>
+                <option value="callApi">调用 API</option>
+              </select>
+            </div>
+            <div v-if="triggerType === 'setParam'">
+              <label class="text-xs" style="color: var(--color-text-dim);">参数键名</label>
+              <div class="flex gap-1 mt-0.5">
+                <select v-if="sharedParamKeys.length > 0" v-model="triggerTarget" @change="applyTrigger" class="flex-1 px-2 py-1.5 rounded text-xs focus:outline-none"
+                  style="background-color: var(--color-bg-surface); border: 1px solid var(--color-border); color: var(--color-text);">
+                  <option value="">新建参数</option>
+                  <option v-for="key in sharedParamKeys" :key="key" :value="key">{{ key }}</option>
+                </select>
+                <input v-else v-model="triggerTarget" @change="applyTrigger" placeholder="参数键名" class="flex-1 px-2 py-1.5 rounded text-xs focus:outline-none"
+                  style="background-color: var(--color-bg-surface); border: 1px solid var(--color-border); color: var(--color-text);" />
+              </div>
+              <label class="text-xs mt-1 block" style="color: var(--color-text-dim);">新值</label>
+              <input v-model="triggerValue" @change="applyTrigger" placeholder="参数值" class="w-full mt-0.5 px-2 py-1.5 rounded text-xs focus:outline-none"
+                style="background-color: var(--color-bg-surface); border: 1px solid var(--color-border); color: var(--color-text);" />
+            </div>
+            <div v-if="triggerType === 'navigatePage'">
+              <label class="text-xs" style="color: var(--color-text-dim);">目标页面</label>
+              <select v-model="triggerTarget" @change="applyTrigger" class="w-full mt-0.5 px-2 py-1.5 rounded text-xs focus:outline-none"
+                style="background-color: var(--color-bg-surface); border: 1px solid var(--color-border); color: var(--color-text);">
+                <option value="">请选择</option>
+                <option v-for="p in availablePages" :key="p.id" :value="p.id">{{ p.name }}</option>
+              </select>
+            </div>
+            <div v-if="triggerType === 'callApi'">
+              <label class="text-xs" style="color: var(--color-text-dim);">API 端点</label>
+              <input v-model="triggerTarget" @change="applyTrigger" placeholder="如 pc.app.launch" class="w-full mt-0.5 px-2 py-1.5 rounded text-xs focus:outline-none"
+                style="background-color: var(--color-bg-surface); border: 1px solid var(--color-border); color: var(--color-text);" />
+              <label class="text-xs mt-1 block" style="color: var(--color-text-dim);">参数 (可选)</label>
+              <input v-model="triggerValue" @change="applyTrigger" placeholder="如 notepad.exe" class="w-full mt-0.5 px-2 py-1.5 rounded text-xs focus:outline-none"
+                style="background-color: var(--color-bg-surface); border: 1px solid var(--color-border); color: var(--color-text);" />
+            </div>
+          </div>
+        </div>
+
+        <!-- 格子样式设置 -->
+        <div class="pt-2 mt-2" style="border-top: 1px solid var(--color-border-subtle);">
+          <h4 class="text-xs font-semibold mb-2 flex items-center gap-1" style="color: var(--color-text-muted);">
+            <Icon icon="solar:palette-bold" class="text-sm" style="color: var(--color-primary);" />
+            格子样式
+          </h4>
+          <div class="space-y-2">
+            <!-- 背景颜色 -->
+            <div>
+              <label class="text-xs" style="color: var(--color-text-dim);">背景颜色</label>
+              <div class="flex gap-1 mt-0.5">
+                <input v-model="cellBgColor" type="color" @change="applyCellStyle" class="w-8 h-7 rounded cursor-pointer shrink-0" />
+                <input v-model="cellBgColor" @change="applyCellStyle" placeholder="transparent" class="flex-1 px-2 py-1 rounded text-xs focus:outline-none"
+                  style="background-color: var(--color-bg-surface); border: 1px solid var(--color-border); color: var(--color-text);" />
+              </div>
+            </div>
+            <!-- 文字内容 -->
+            <div>
+              <label class="text-xs" style="color: var(--color-text-dim);">文字内容</label>
+              <input v-model="cellText" @change="applyCellStyle" placeholder="格子显示文字" class="w-full mt-0.5 px-2 py-1.5 rounded text-xs focus:outline-none"
+                style="background-color: var(--color-bg-surface); border: 1px solid var(--color-border); color: var(--color-text);" />
+            </div>
+            <div v-if="cellText" class="space-y-2">
+              <!-- 文字颜色 -->
+              <div class="flex gap-2">
+                <div class="flex-1">
+                  <label class="text-xs" style="color: var(--color-text-dim);">文字颜色</label>
+                  <div class="flex gap-1 mt-0.5">
+                    <input v-model="cellTextColor" type="color" @change="applyCellStyle" class="w-8 h-7 rounded cursor-pointer shrink-0" />
+                    <input v-model="cellTextColor" @change="applyCellStyle" class="flex-1 px-2 py-1 rounded text-xs focus:outline-none"
+                      style="background-color: var(--color-bg-surface); border: 1px solid var(--color-border); color: var(--color-text);" />
+                  </div>
+                </div>
+                <div class="flex-1">
+                  <label class="text-xs" style="color: var(--color-text-dim);">字号</label>
+                  <input v-model.number="cellFontSize" type="number" min="8" max="72" @change="applyCellStyle" class="w-full mt-0.5 px-2 py-1 rounded text-xs focus:outline-none"
+                    style="background-color: var(--color-bg-surface); border: 1px solid var(--color-border); color: var(--color-text);" />
+                </div>
+              </div>
+              <!-- 文字位置 -->
+              <div>
+                <label class="text-xs" style="color: var(--color-text-dim);">文字位置</label>
+                <div class="flex gap-1 mt-0.5">
+                  <button v-for="pos in (['center', 'top', 'bottom'] as const)" :key="pos"
+                    class="flex-1 px-2 py-1 text-xs rounded-lg transition-colors"
+                    :style="cellTextPosition === pos ? 'background-color: var(--color-primary); color: white;' : 'background-color: var(--color-bg-surface); color: var(--color-text-muted);'"
+                    @click="cellTextPosition = pos; applyCellStyle()"
+                  >{{ pos === 'center' ? '居中' : pos === 'top' ? '顶部' : '底部' }}</button>
+                </div>
+              </div>
+              <!-- 字体 -->
+              <div>
+                <label class="text-xs" style="color: var(--color-text-dim);">字体</label>
+                <select v-model="cellFontFamily" @change="applyCellStyle" class="w-full mt-0.5 px-2 py-1.5 rounded text-xs focus:outline-none"
+                  style="background-color: var(--color-bg-surface); border: 1px solid var(--color-border); color: var(--color-text);">
+                  <option value="system-ui">系统默认</option>
+                  <option value="Inter">Inter</option>
+                  <option value="monospace">等宽字体</option>
+                  <option value="serif">衬线字体</option>
+                  <option value="cursive">手写字体</option>
+                </select>
+              </div>
+              <!-- 文字样式 -->
+              <div>
+                <label class="text-xs" style="color: var(--color-text-dim);">文字样式</label>
+                <div class="flex gap-1 mt-0.5">
+                  <button
+                    class="px-2.5 py-1 text-xs rounded-lg transition-colors font-bold"
+                    :style="cellBold ? 'background-color: var(--color-primary); color: white;' : 'background-color: var(--color-bg-surface); color: var(--color-text-muted);'"
+                    @click="cellBold = !cellBold; applyCellStyle()"
+                  >B</button>
+                  <button
+                    class="px-2.5 py-1 text-xs rounded-lg transition-colors italic"
+                    :style="cellItalic ? 'background-color: var(--color-primary); color: white;' : 'background-color: var(--color-bg-surface); color: var(--color-text-muted);'"
+                    @click="cellItalic = !cellItalic; applyCellStyle()"
+                  >I</button>
+                  <button
+                    class="px-2.5 py-1 text-xs rounded-lg transition-colors underline"
+                    :style="cellUnderline ? 'background-color: var(--color-primary); color: white;' : 'background-color: var(--color-bg-surface); color: var(--color-text-muted);'"
+                    @click="cellUnderline = !cellUnderline; applyCellStyle()"
+                  >U</button>
+                  <button
+                    class="px-2.5 py-1 text-xs rounded-lg transition-colors line-through"
+                    :style="cellStrikethrough ? 'background-color: var(--color-primary); color: white;' : 'background-color: var(--color-bg-surface); color: var(--color-text-muted);'"
+                    @click="cellStrikethrough = !cellStrikethrough; applyCellStyle()"
+                  >S</button>
+                </div>
+              </div>
+            </div>
+            <!-- 背景图片 -->
+            <div>
+              <label class="text-xs" style="color: var(--color-text-dim);">背景图片</label>
+              <div class="flex gap-1 mt-0.5">
+                <input v-model="cellBgImage" @change="applyCellStyle" placeholder="图片URL" class="flex-1 px-2 py-1 rounded text-xs focus:outline-none"
+                  style="background-color: var(--color-bg-surface); border: 1px solid var(--color-border); color: var(--color-text);" />
+                <button @click="pickCellBgImage" class="px-2 py-1 rounded text-xs" style="background-color: var(--color-bg-surface); border: 1px solid var(--color-border); color: var(--color-text-muted);" title="选择本地图片">
+                  <Icon icon="solar:folder-open-bold" class="text-xs" />
+                </button>
+              </div>
+              <div v-if="cellBgImage" class="rounded overflow-hidden mt-1" style="max-height: 40px;">
+                <img :src="cellBgImage" class="w-full h-full object-cover" />
+              </div>
+            </div>
+            <!-- 背景视频 -->
+            <div>
+              <label class="text-xs" style="color: var(--color-text-dim);">背景视频</label>
+              <div class="flex gap-1 mt-0.5">
+                <input v-model="cellBgVideo" @change="applyCellStyle" placeholder="视频URL" class="flex-1 px-2 py-1 rounded text-xs focus:outline-none"
+                  style="background-color: var(--color-bg-surface); border: 1px solid var(--color-border); color: var(--color-text);" />
+                <button @click="pickCellBgVideo" class="px-2 py-1 rounded text-xs" style="background-color: var(--color-bg-surface); border: 1px solid var(--color-border); color: var(--color-text-muted);" title="选择本地视频">
+                  <Icon icon="solar:folder-open-bold" class="text-xs" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -318,8 +638,9 @@ const deviceLabel = computed(() => {
         <div
           class="absolute inset-0 grid gap-1"
           :style="{
-            gridTemplateColumns: `repeat(${page.columns}, 1fr)`,
-            gridTemplateRows: `repeat(${page.rows}, 1fr)`,
+            gridTemplateColumns: `repeat(${page.columns}, ${gridSizeStyle}px)`,
+            gridTemplateRows: `repeat(${page.rows}, ${gridSizeStyle}px)`,
+            placeContent: 'center',
             padding: pageCustomPadding
               ? `${paddingTop}px ${paddingRight}px ${paddingBottom}px ${paddingLeft}px`
               : '16px',
@@ -328,16 +649,40 @@ const deviceLabel = computed(() => {
           <div
             v-for="cell in page.cells"
             :key="cell.id"
-            class="rounded-md border-2 flex items-center justify-center cursor-pointer transition-colors"
+            class="rounded-md border-2 flex items-center justify-center cursor-pointer transition-colors overflow-hidden relative"
             :style="{
               gridColumn: `${cell.column + 1} / span ${cell.columnSpan}`,
               gridRow: `${cell.row + 1} / span ${cell.rowSpan}`,
-              borderColor: cell.id === selectedCellId ? 'var(--color-primary)' : cell.componentId ? 'var(--color-border)' : 'var(--color-border-subtle)',
-              backgroundColor: cell.id === selectedCellId ? 'rgba(59,130,246,0.15)' : cell.componentId ? 'var(--color-bg-surface)' : 'transparent',
+              borderColor: cell.id === selectedCellId ? 'var(--color-primary)' : cell.componentId || cell.style?.text || cell.style?.backgroundImage ? 'var(--color-border)' : 'var(--color-border-subtle)',
+              backgroundColor: cell.style?.backgroundColor && cell.style.backgroundColor !== 'transparent'
+                ? cell.style.backgroundColor
+                : cell.id === selectedCellId ? 'rgba(59,130,246,0.15)' : cell.componentId ? 'var(--color-bg-surface)' : 'transparent',
             }"
             @click="selectCell(cell)"
           >
-            <div v-if="cell.componentId" class="text-center w-full h-full overflow-hidden">
+            <!-- 格子背景图片 -->
+            <img v-if="cell.style?.backgroundImage" :src="cell.style.backgroundImage" class="absolute inset-0 w-full h-full object-cover" />
+            <!-- 格子背景视频 -->
+            <video v-if="cell.style?.backgroundVideo" :src="cell.style.backgroundVideo" autoplay loop muted class="absolute inset-0 w-full h-full object-cover" />
+            <!-- 触发器标识 -->
+            <div v-if="cell.trigger && cell.trigger.type !== 'none'" class="absolute top-0.5 right-0.5" style="z-index: 3;">
+              <Icon icon="solar:bolt-bold" class="text-xs" style="color: var(--color-primary);" />
+            </div>
+            <!-- 自定义文字 -->
+            <span v-if="cell.style?.text"
+              class="relative z-[1] text-center px-1 break-words"
+              :style="{
+                color: cell.style.textColor || '#fff',
+                fontFamily: cell.style.fontFamily || 'system-ui',
+                fontSize: (cell.style.fontSize || 14) + 'px',
+                fontWeight: cell.style.bold ? 'bold' : 'normal',
+                fontStyle: cell.style.italic ? 'italic' : 'normal',
+                textDecoration: textDecorationStyle(cell.style),
+                ...textPositionStyle(cell.style.textPosition || 'center'),
+              }"
+            >{{ cell.style.text }}</span>
+            <!-- 组件预览（无自定义文字时显示） -->
+            <div v-else-if="cell.componentId" class="text-center w-full h-full overflow-hidden relative z-[1]">
               <!-- 有预览图时显示预览图 -->
               <img
                 v-if="availableComponents.find(c => c.id === cell.componentId)?.previewImage"
@@ -352,7 +697,8 @@ const deviceLabel = computed(() => {
                 </p>
               </template>
             </div>
-            <Icon v-else icon="solar:add-circle-linear" class="text-lg" style="color: var(--color-text-dim);" />
+            <!-- 空格子 -->
+            <Icon v-if="!cell.componentId && !cell.style?.text && !cell.style?.backgroundImage && !cell.style?.backgroundVideo" icon="solar:add-circle-linear" class="text-lg" style="color: var(--color-text-dim);" />
           </div>
         </div>
       </div>

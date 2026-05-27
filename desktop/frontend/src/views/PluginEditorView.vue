@@ -272,11 +272,13 @@ const devGuide = [
 
       <!-- 操作按钮 -->
       <div class="flex gap-2">
-        <button @click="save" class="flex-1 px-3 py-2 rounded-lg text-sm text-white transition-colors" style="background-color: var(--color-primary);">
-          <Icon icon="solar:diskette-bold" class="inline mr-1" />保存
+        <button @click="save" class="flex-1 btn-primary">
+          <Icon icon="solar:diskette-bold" class="text-base" />
+          保存
         </button>
-        <button @click="exportPlugin" class="px-3 py-2 rounded-lg text-sm transition-colors border" style="border-color: var(--color-border); color: var(--color-text-muted);">
-          <Icon icon="solar:download-bold" class="inline mr-1" />导出
+        <button @click="exportPlugin" class="btn-secondary">
+          <Icon icon="solar:export-bold" class="text-base" />
+          导出
         </button>
       </div>
       <button @click="openHelp" class="w-full px-3 py-2 rounded-lg text-sm transition-colors border flex items-center justify-center gap-1" style="border-color: var(--color-border); color: var(--color-primary);">

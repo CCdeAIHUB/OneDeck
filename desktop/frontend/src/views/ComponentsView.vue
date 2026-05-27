@@ -3,11 +3,13 @@ import { Icon } from '@iconify/vue'
 import PageHeader from '@/components/PageHeader.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useDesignStore } from '@/stores/design'
+import { useNotificationStore } from '@/stores/notification'
 import { useRouter } from 'vue-router'
 import { ref } from 'vue'
 
 const designStore = useDesignStore()
 const router = useRouter()
+const notify = useNotificationStore()
 
 const showDeleteConfirm = ref(false)
 const deleteTargetId = ref<string | null>(null)
@@ -32,6 +34,7 @@ function askDeleteComponent(id: string) {
 function confirmDeleteComponent() {
   if (deleteTargetId.value) {
     designStore.deleteComponent(deleteTargetId.value)
+    notify.success('组件已删除')
   }
   showDeleteConfirm.value = false
   deleteTargetId.value = null
@@ -45,6 +48,45 @@ function exportComponent(comp: any) {
   a.download = `component-${comp.name}-${Date.now()}.json`
   a.click()
   URL.revokeObjectURL(url)
+  notify.success('组件已导出')
+}
+
+function exportAllComponents() {
+  const blob = new Blob([JSON.stringify(designStore.components, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `onedesk-components-${Date.now()}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+  notify.success('组件已导出')
+}
+
+function importComponents() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.json'
+  input.onchange = (e) => {
+    const file = (e.target as HTMLInputElement).files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target?.result as string)
+        if (Array.isArray(data)) {
+          data.forEach((c: any) => designStore.components.push(c))
+          notify.success(`已导入 ${data.length} 个组件`)
+        } else if (data.components) {
+          data.components.forEach((c: any) => designStore.components.push(c))
+          notify.success(`已导入 ${data.components.length} 个组件`)
+        }
+      } catch {
+        notify.error('导入失败：文件格式无效')
+      }
+    }
+    reader.readAsText(file)
+  }
+  input.click()
 }
 </script>
 
@@ -52,6 +94,14 @@ function exportComponent(comp: any) {
   <div>
     <PageHeader title="组件" subtitle="设计移动端组件样式与逻辑" icon="solar:widget-2-bold">
       <template #actions>
+        <button class="btn-secondary" @click="importComponents">
+          <Icon icon="solar:import-bold" class="text-base" />
+          导入
+        </button>
+        <button class="btn-secondary" @click="exportAllComponents">
+          <Icon icon="solar:export-bold" class="text-base" />
+          导出
+        </button>
         <button class="btn-primary" @click="createNew">
           <Icon icon="solar:add-circle-bold" class="text-base" />
           新建组件

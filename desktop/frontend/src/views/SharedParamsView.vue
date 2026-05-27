@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import PageHeader from '@/components/PageHeader.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useSharedParamsStore } from '@/stores/sharedParams'
+import { useNotificationStore } from '@/stores/notification'
 import { ref, computed } from 'vue'
 
 const sharedParams = useSharedParamsStore()
+const notify = useNotificationStore()
 
 const newKey = ref('')
 const newValue = ref('')
@@ -12,6 +15,11 @@ const newValueType = ref<'string' | 'number' | 'boolean' | 'object'>('string')
 const editingKey = ref<string | null>(null)
 const editValue = ref('')
 const showAddDialog = ref(false)
+// 删除确认
+const showDeleteConfirm = ref(false)
+const deleteTargetKey = ref('')
+// 清空确认
+const showClearConfirm = ref(false)
 
 const paramEntries = computed(() => {
   return Object.entries(sharedParams.params).map(([key, value]) => ({
@@ -64,9 +72,14 @@ function cancelEdit() {
 }
 
 function deleteParam(key: string) {
-  if (confirm(`确定删除参数 "${key}"？`)) {
-    sharedParams.remove(key)
-  }
+  deleteTargetKey.value = key
+  showDeleteConfirm.value = true
+}
+
+function confirmDeleteParam() {
+  sharedParams.remove(deleteTargetKey.value)
+  showDeleteConfirm.value = false
+  notify.success('参数已删除')
 }
 
 function exportParams() {
@@ -91,8 +104,9 @@ function importParams() {
     reader.onload = (ev) => {
       try {
         sharedParams.importJson(ev.target?.result as string, true)
+        notify.success('参数已导入')
       } catch {
-        alert('导入失败：无效的 JSON 格式')
+        notify.error('导入失败：无效的 JSON 格式')
       }
     }
     reader.readAsText(file)
@@ -101,9 +115,13 @@ function importParams() {
 }
 
 function clearAll() {
-  if (confirm('确定清空所有参数？此操作不可恢复。')) {
-    sharedParams.clear()
-  }
+  showClearConfirm.value = true
+}
+
+function confirmClearAll() {
+  sharedParams.clear()
+  showClearConfirm.value = false
+  notify.success('参数已清空')
 }
 
 function formatValue(value: unknown): string {
@@ -214,8 +232,8 @@ function formatValue(value: unknown): string {
     </div>
 
     <!-- 新增参数对话框 -->
-    <div v-if="showAddDialog" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showAddDialog = false">
-      <div class="rounded-xl p-6 w-96 space-y-4" style="background-color: var(--color-bg-card);">
+    <div v-if="showAddDialog" class="dialog-overlay" @click.self="showAddDialog = false">
+      <div class="dialog-card space-y-4">
         <h3 class="text-lg font-bold">新增参数</h3>
         <div>
           <label class="text-sm" style="color: var(--color-text-muted);">键名</label>
@@ -296,5 +314,27 @@ function formatValue(value: unknown): string {
         </div>
       </div>
     </div>
+
+    <!-- 删除确认 -->
+    <ConfirmDialog
+      v-if="showDeleteConfirm"
+      title="删除参数"
+      :message="`确定要删除参数「${deleteTargetKey}」吗？`"
+      confirm-text="删除"
+      :danger="true"
+      @confirm="confirmDeleteParam"
+      @cancel="showDeleteConfirm = false"
+    />
+
+    <!-- 清空确认 -->
+    <ConfirmDialog
+      v-if="showClearConfirm"
+      title="清空所有参数"
+      message="确定要清空所有参数吗？此操作不可恢复。"
+      confirm-text="清空"
+      :danger="true"
+      @confirm="confirmClearAll"
+      @cancel="showClearConfirm = false"
+    />
   </div>
 </template>
